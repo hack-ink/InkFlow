@@ -9,7 +9,9 @@
 # Language Specifics
 
 ## JavaScript/TypeScript
+dist
 node_modules
+.vite
 
 ## Python
 __pycache__
@@ -23,6 +25,9 @@ target
 .DS_Store
 
 # General Ignores
+model
+third_party/sherpa-onnx-prefix/
+third_party/sherpa-onnx-build-*/
 tmp
 *.bak
 *.log

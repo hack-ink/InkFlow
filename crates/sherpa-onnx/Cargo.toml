@@ -1,0 +1,18 @@
+[package]
+authors.workspace     = true
+description.workspace = true
+edition.workspace     = true
+homepage.workspace    = true
+license.workspace     = true
+name                  = "sherpa-onnx"
+publish               = false
+repository.workspace  = true
+version.workspace     = true
+
+[dependencies]
+# crates.io
+libloading = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+# self
+sherpa-onnx-sys = { workspace = true }

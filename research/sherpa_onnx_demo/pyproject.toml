@@ -1,0 +1,21 @@
+[tool.poetry]
+authors      = ["AiR_ <devnull@example.com>"]
+description  = "One-command sherpa-onnx streaming ASR demo (model auto-download)."
+name         = "sherpa-onnx-demo"
+package-mode = true
+packages     = [{ include = "sherpa_onnx_demo" }]
+readme       = "README.md"
+version      = "0.1.0"
+
+[tool.poetry.dependencies]
+numpy       = "^2.2.0"
+python      = ">=3.10,<4.0"
+sherpa-onnx = "^1.12.19"
+sounddevice = "^0.5.3"
+
+[tool.poetry.scripts]
+sherpa-onnx-demo = "sherpa_onnx_demo.cli:main"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires      = ["poetry-core>=2.0.0,<3.0.0"]

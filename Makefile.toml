@@ -8,6 +8,15 @@ args = [
 	"--all-features",
 ]
 
+[tasks.dev]
+workspace = false
+dependencies = ["setup-macos"]
+command = "cargo"
+args = [
+	"tauri",
+	"dev",
+]
+
 [tasks.fmt]
 workspace = false
 command = "cargo"
@@ -26,6 +35,25 @@ args = [
 	"--workspace",
 	"--all-targets",
 	"--all-features",
+	"--no-tests",
+	"pass",
+]
+
+[tasks.setup-macos]
+workspace = false
+command = "bash"
+args = [
+	"script/setup_macos.sh",
+]
+
+[tasks.release]
+workspace = false
+dependencies = ["setup-macos"]
+command = "cargo"
+args = [
+	"tauri",
+	"dev",
+	"--release"
 ]
 
 [tasks.udeps]
@@ -38,3 +66,31 @@ args = [
 	"--all-targets",
 	"--all-features",
 ]
+
+[tasks.stt-compare]
+workspace = false
+dependencies = ["setup-macos"]
+command = "bash"
+args = [
+	"-lc",
+	"if [[ \"$(uname -s)\" == \"Darwin\" ]]; then export RUSTFLAGS=\"$RUSTFLAGS -lc++ -l framework=Accelerate\"; fi; cargo run -p stt-compare --release -- asset/samples_jfk.wav",
+]
+
+[tasks.stt-compare-mic]
+workspace = false
+dependencies = ["setup-macos"]
+command = "bash"
+args = [
+	"-lc",
+	"if [[ \"$(uname -s)\" == \"Darwin\" ]]; then export RUSTFLAGS=\"$RUSTFLAGS -lc++ -l framework=Accelerate\"; fi; cargo run -p stt-compare --release -- --mic",
+]
+
+[tasks.sherpa-demo]
+workspace = false
+command = "bash"
+args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo"]
+
+[tasks.sherpa-demo-mic]
+workspace = false
+command = "bash"
+args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo --mic"]

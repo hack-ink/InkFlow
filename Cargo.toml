@@ -1,20 +1,50 @@
-[package]
+[workspace]
+members = [
+	"crates/sherpa-onnx",
+	"crates/sherpa-onnx-sys",
+	"research/stt_compare",
+	"src-tauri",
+]
+resolver = "3"
+
+[workspace.package]
 authors     = ["Xavier Lau <x@acg.box>"]
-build       = "build.rs"
-categories  = []
-description = "<DESCRIPTION>"
+description = "AiR is a macOS-first, local dictation overlay (SuperWhisper-like) built with Rust and Tauri."
 edition     = "2024"
-homepage    = "https://hack.ink/<NAME>"
-keywords    = []
+homepage    = "https://github.com/hack-ink/AiR_"
 license     = "GPL-3.0"
-name        = "rust-initializer"
 readme      = "README.md"
-repository  = "https://github.com/hack-ink/<NAME>"
-resolver    = "3"
+repository  = "https://github.com/hack-ink/AiR_"
 version     = "0.1.0"
 
-[package.metadata.docs.rs]
-all-features = true
+[workspace.dependencies]
+# crates.io
+anyhow                       = { version = "1.0" }
+bindgen                      = { version = "0.72", default-features = false, features = ["runtime"] }
+clap                         = { version = "4.5", features = ["derive"] }
+color-eyre                   = { version = "0.6" }
+cpal                         = { version = "0.16" }
+futures-util                 = { version = "0.3" }
+hound                        = { version = "3.5" }
+libloading                   = { version = "0.9" }
+log                          = { version = "0.4" }
+objc2                        = { version = "0.6" }
+objc2-app-kit                = { version = "0.3", default-features = false }
+reqwest                      = { version = "0.12", features = ["json"] }
+serde                        = { version = "1.0", features = ["derive"] }
+serde_json                   = { version = "1.0" }
+tauri                        = { version = "2.9" }
+tauri-build                  = { version = "2.5" }
+tauri-plugin-global-shortcut = { version = "2.3" }
+tauri-plugin-log             = { version = "2.7" }
+tokio                        = { version = "1.48", features = ["sync", "time"] }
+tokio-util                   = { version = "0.7" }
+tracing-subscriber           = { version = "0.3", features = ["env-filter"] }
+vergen-gitcl                 = { version = "1.0", features = ["cargo"] }
+whisper-rs                   = { version = "0.15" }
+# self
+sherpa-onnx     = { version = "0.1", path = "crates/sherpa-onnx" }
+sherpa-onnx-sys = { version = "0.1", path = "crates/sherpa-onnx-sys" }
 
 [profile.ci-dev]
 incremental = false
@@ -23,20 +53,3 @@ inherits    = "dev"
 [profile.ci-release]
 inherits = "release"
 lto      = true
-
-[features]
-dev = []
-
-[build-dependencies]
-# crates.io
-vergen-gitcl = { version = "1.0", features = ["cargo"] }
-
-[dependencies]
-# crates.io
-anyhow             = { version = "1.0" }
-app_dirs2          = { version = "2.5" }
-clap               = { version = "4.5", features = ["derive"] }
-color-eyre         = { version = "0.6" }
-tracing            = { version = "0.1" }
-tracing-appender   = { version = "0.2" }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
