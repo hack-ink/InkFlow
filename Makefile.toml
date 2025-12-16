@@ -73,7 +73,7 @@ dependencies = ["setup-macos"]
 command = "bash"
 args = [
 	"-lc",
-	"if [[ \"$(uname -s)\" == \"Darwin\" ]]; then export RUSTFLAGS=\"$RUSTFLAGS -lc++ -l framework=Accelerate\"; fi; cargo run -p stt-compare --release -- asset/samples_jfk.wav",
+	"if [[ \"$(uname -s)\" == \"Darwin\" ]]; then export RUSTFLAGS=\"$RUSTFLAGS -lc++ -l framework=Accelerate\"; fi; cargo run -p stt-compare --release -- --manifest research/stt_compare/manifest.toml",
 ]
 
 [tasks.stt-compare-mic]

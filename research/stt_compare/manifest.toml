@@ -1,0 +1,9 @@
+# stt-compare input manifest.
+#
+# Each entry describes one runnable case:
+# - wav: Path to the WAV file (absolute or relative to this manifest file).
+# - text: Optional reference transcript used for WER/CER scoring.
+
+[[references]]
+wav = "../../asset/samples_jfk.wav"
+text = "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
