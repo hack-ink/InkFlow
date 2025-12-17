@@ -38,4 +38,7 @@ pub struct WhisperConfig {
 	pub force_gpu: Option<bool>,
 	pub window_ms: u32,
 	pub step_ms: u32,
+	pub best_of: i32,
+	pub beam_size: Option<i32>,
+	pub beam_patience: f32,
 }

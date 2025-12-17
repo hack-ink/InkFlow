@@ -34,7 +34,12 @@ pub fn transcribe(
 	let mut state = ctx
 		.create_state()
 		.map_err(|e| eyre::eyre!("Failed to create whisper decoder state: {e}"))?;
-	let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
+	let sampling = if let Some(beam_size) = config.beam_size {
+		SamplingStrategy::BeamSearch { beam_size, patience: config.beam_patience }
+	} else {
+		SamplingStrategy::Greedy { best_of: config.best_of }
+	};
+	let mut params = FullParams::new(sampling);
 
 	if let Some(threads) = config.num_threads {
 		params.set_n_threads(threads);

@@ -39,6 +39,7 @@ tauri-plugin-global-shortcut = { version = "2.3" }
 tauri-plugin-log             = { version = "2.7" }
 tokio                        = { version = "1.48", features = ["sync", "time"] }
 tokio-util                   = { version = "0.7" }
+toml                         = { version = "0.9" }
 tracing-subscriber           = { version = "0.3", features = ["env-filter"] }
 vergen-gitcl                 = { version = "1.0", features = ["cargo"] }
 whisper-rs                   = { version = "0.15" }

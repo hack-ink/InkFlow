@@ -5,5 +5,17 @@
 # - text: Optional reference transcript used for WER/CER scoring.
 
 [[references]]
-wav = "../../asset/samples_jfk.wav"
+wav = "../../asset/sample/01_and_so_my_fellow_americans.wav"
 text = "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+
+[[references]]
+wav = "../../asset/sample/02_after_early_nightfall.wav"
+text = "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+
+[[references]]
+wav = "../../asset/sample/03_god_as_a_direct_consequence.wav"
+text = "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONOURED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN"
+
+[[references]]
+wav = "../../asset/sample/04_yet_these_thoughts.wav"
+text = "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION"

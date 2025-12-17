@@ -21,7 +21,7 @@ color-eyre         = { workspace = true }
 cpal               = { workspace = true }
 hound              = { workspace = true }
 serde              = { workspace = true }
-toml               = { version = "0.8" }
+toml               = { workspace = true }
 tracing-subscriber = { workspace = true }
 # self
 sherpa-onnx = { workspace = true }
