@@ -1,74 +1,33 @@
-// std
-use std::sync::mpsc::{self, Receiver, SyncSender};
+use std::{
+	pin::Pin,
+	sync::{Arc, Mutex},
+	time::Duration,
+};
 
-// self
-use crate::{config::MIC_CHUNK_QUEUE_CAPACITY, prelude::*};
+use futures_util::Stream;
+use tokio::sync::{mpsc, oneshot};
 
-#[derive(Clone, Copy, Debug)]
-pub enum MicSampleFormat {
-	F32,
-}
+use crate::error::AppError;
 
-pub struct MicStream {
-	pub sample_rate_hz: u32,
-	pub channels: usize,
-	pub device_name: String,
-	pub sample_format: MicSampleFormat,
-	pub receiver: Receiver<Vec<f32>>,
-	_capture: MicCapture,
-}
+const MIC_CHUNK_QUEUE_CAPACITY: usize = 256;
 
-impl MicStream {
-	pub fn open_default() -> Result<Self> {
-		let (sender, receiver) = mpsc::sync_channel::<Vec<f32>>(MIC_CHUNK_QUEUE_CAPACITY);
-		let (sample_rate_hz, capture) = start_mic_capture(sender)?;
-
-		Ok(Self {
-			sample_rate_hz,
-			channels: 1,
-			device_name: "Default microphone (Audio Queue)".to_string(),
-			sample_format: MicSampleFormat::F32,
-			receiver,
-			_capture: capture,
-		})
-	}
-}
-
-#[cfg(not(target_os = "macos"))]
-fn start_mic_capture(_sender: SyncSender<Vec<f32>>) -> Result<(u32, MicCapture)> {
-	Err(eyre::eyre!("Microphone capture is currently only supported on macOS."))
-}
-
-#[cfg(not(target_os = "macos"))]
-struct MicCapture;
-
-#[cfg(target_os = "macos")]
-fn start_mic_capture(sender: SyncSender<Vec<f32>>) -> Result<(u32, MicCapture)> {
-	let (sample_rate_hz, audio_queue, callback_state) =
-		macos_audio::start_audio_queue_input(sender)?;
-	Ok((sample_rate_hz, MicCapture { audio_queue, _callback_state: callback_state }))
-}
-
-#[cfg(target_os = "macos")]
-struct MicCapture {
-	audio_queue: macos_audio::AudioQueueInstance,
-	_callback_state: Box<macos_audio::CallbackState>,
-}
-
-#[cfg(target_os = "macos")]
-impl Drop for MicCapture {
-	fn drop(&mut self) {
-		self.audio_queue.stop();
-	}
+#[derive(Clone)]
+pub struct MicRecording {
+	sample_rate: u32,
+	samples: Arc<Mutex<Vec<f32>>>,
 }
 
 #[cfg(target_os = "macos")]
 mod macos_audio {
-	use std::{ffi::c_void, mem};
+	use std::{
+		ffi::c_void,
+		mem,
+		sync::{Arc, Mutex},
+	};
 
-	use std::sync::mpsc::SyncSender;
+	use tokio::sync::mpsc;
 
-	use crate::prelude::*;
+	use crate::error::AppError;
 
 	type OSStatus = i32;
 	type UInt32 = u32;
@@ -201,12 +160,14 @@ mod macos_audio {
 	}
 
 	pub(super) struct CallbackState {
-		sender: SyncSender<Vec<f32>>,
+		chunk_sender: mpsc::Sender<Vec<f32>>,
+		samples: Arc<Mutex<Vec<f32>>>,
 	}
 
 	pub(super) fn start_audio_queue_input(
-		sender: SyncSender<Vec<f32>>,
-	) -> Result<(u32, AudioQueueInstance, Box<CallbackState>)> {
+		chunk_sender: mpsc::Sender<Vec<f32>>,
+		samples: Arc<Mutex<Vec<f32>>>,
+	) -> Result<(u32, AudioQueueInstance, Box<CallbackState>), AppError> {
 		unsafe {
 			let requested_format = AudioStreamBasicDescription {
 				m_sample_rate: PREFERRED_SAMPLE_RATE_HZ as Float64,
@@ -220,7 +181,7 @@ mod macos_audio {
 				m_reserved: 0,
 			};
 
-			let mut callback_state = Box::new(CallbackState { sender });
+			let mut callback_state = Box::new(CallbackState { chunk_sender, samples });
 
 			let mut queue: AudioQueueRef = std::ptr::null_mut();
 			let status = AudioQueueNewInput(
@@ -233,8 +194,9 @@ mod macos_audio {
 				&mut queue as *mut AudioQueueRef,
 			);
 			if status != 0 || queue.is_null() {
-				return Err(eyre::eyre!(
-					"Failed to create the input audio queue (OSStatus {status})."
+				return Err(AppError::new(
+					"microphone_start_failed",
+					format!("Failed to create the input audio queue (OSStatus {status})."),
 				));
 			}
 
@@ -252,8 +214,9 @@ mod macos_audio {
 				if status != 0 || buffer.is_null() {
 					let mut instance = AudioQueueInstance { queue };
 					instance.stop();
-					return Err(eyre::eyre!(
-						"Failed to allocate an input buffer (OSStatus {status})."
+					return Err(AppError::new(
+						"microphone_start_failed",
+						format!("Failed to allocate an input buffer (OSStatus {status})."),
 					));
 				}
 
@@ -262,8 +225,9 @@ mod macos_audio {
 				if status != 0 {
 					let mut instance = AudioQueueInstance { queue };
 					instance.stop();
-					return Err(eyre::eyre!(
-						"Failed to enqueue an input buffer (OSStatus {status})."
+					return Err(AppError::new(
+						"microphone_start_failed",
+						format!("Failed to enqueue an input buffer (OSStatus {status})."),
 					));
 				}
 			}
@@ -272,17 +236,32 @@ mod macos_audio {
 			if status != 0 {
 				let mut instance = AudioQueueInstance { queue };
 				instance.stop();
-				return Err(eyre::eyre!(
-					"Failed to start the input audio queue (OSStatus {status})."
+				return Err(AppError::new(
+					"microphone_start_failed",
+					format!("Failed to start the input audio queue (OSStatus {status})."),
 				));
 			}
 
-			let sample_rate = query_sample_rate(queue).unwrap_or(PREFERRED_SAMPLE_RATE_HZ);
+			let sample_rate = match query_sample_rate(queue) {
+				Ok(rate) => rate,
+				Err(err) => {
+					log::warn!(
+						"Falling back to the preferred sample rate because querying the audio queue sample rate failed: {}.",
+						err.message
+					);
+					PREFERRED_SAMPLE_RATE_HZ
+				},
+			};
+
+			log::info!(
+				"Starting macOS microphone capture via AudioQueue input. System processing depends on the input device and macOS settings."
+			);
+
 			Ok((sample_rate, AudioQueueInstance { queue }, callback_state))
 		}
 	}
 
-	unsafe fn query_sample_rate(queue: AudioQueueRef) -> Option<u32> {
+	unsafe fn query_sample_rate(queue: AudioQueueRef) -> Result<u32, AppError> {
 		let mut value: Float64 = 0.0;
 		let mut size = mem::size_of_val(&value) as UInt32;
 		let status = unsafe {
@@ -294,15 +273,21 @@ mod macos_audio {
 			)
 		};
 		if status != 0 {
-			return None;
+			return Err(AppError::new(
+				"microphone_start_failed",
+				format!("Failed to query audio queue sample rate (OSStatus {status})."),
+			));
 		}
 
 		let rate = value.round();
 		if rate <= 0.0 {
-			return None;
+			return Err(AppError::new(
+				"microphone_start_failed",
+				"Microphone sample rate must be greater than zero.",
+			));
 		}
 
-		Some(rate.min(Float64::from(u32::MAX)) as u32)
+		Ok(rate.min(Float64::from(u32::MAX)) as u32)
 	}
 
 	unsafe extern "C" fn input_callback(
@@ -344,9 +329,181 @@ mod macos_audio {
 			*sample = sample.clamp(-1.0, 1.0);
 		}
 
-		let _ = state.sender.try_send(chunk);
+		if let Ok(mut guard) = state.samples.lock() {
+			guard.extend_from_slice(&chunk);
+		}
+
+		let _ = state.chunk_sender.try_send(chunk);
 
 		buffer.m_audio_data_byte_size = buffer.m_audio_data_bytes_capacity;
 		let _ = unsafe { AudioQueueEnqueueBuffer(in_aq, in_buffer, 0, std::ptr::null()) };
+	}
+}
+
+impl MicRecording {
+	pub fn take(&self) -> RecordedAudio {
+		let samples =
+			self.samples.lock().map(|mut guard| std::mem::take(&mut *guard)).unwrap_or_default();
+
+		RecordedAudio { sample_rate: self.sample_rate, samples }
+	}
+}
+
+#[allow(dead_code)]
+pub struct RecordedAudio {
+	pub sample_rate: u32,
+	pub samples: Vec<f32>,
+}
+
+pub struct MicStream {
+	sample_rate: u32,
+	stop_tx: std::sync::mpsc::Sender<()>,
+	chunk_receiver: mpsc::Receiver<Vec<f32>>,
+	current_chunk: Option<Vec<f32>>,
+	current_chunk_index: usize,
+}
+
+impl MicStream {
+	pub async fn open_default() -> Result<(Self, MicRecording), AppError> {
+		let (chunk_sender, chunk_receiver) = mpsc::channel::<Vec<f32>>(MIC_CHUNK_QUEUE_CAPACITY);
+		let samples = Arc::new(Mutex::new(Vec::<f32>::new()));
+		let samples_for_callback = samples.clone();
+
+		let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+		let (ready_tx, ready_rx) = oneshot::channel::<Result<u32, AppError>>();
+
+		std::thread::spawn(move || {
+			let start_result = start_mic_capture(chunk_sender, samples_for_callback);
+
+			match start_result {
+				Ok((sample_rate, capture)) => {
+					let _ = ready_tx.send(Ok(sample_rate));
+					let _ = stop_rx.recv();
+					drop(capture);
+				},
+				Err(err) => {
+					let _ = ready_tx.send(Err(err));
+				},
+			}
+		});
+
+		let sample_rate = match tokio::time::timeout(Duration::from_secs(5), ready_rx).await {
+			Ok(Ok(Ok(sample_rate))) => sample_rate,
+			Ok(Ok(Err(err))) => return Err(err),
+			Ok(Err(_)) => {
+				return Err(AppError::new(
+					"microphone_start_failed",
+					"Failed to receive microphone startup status.",
+				));
+			},
+			Err(_) => {
+				return Err(AppError::new(
+					"microphone_start_timeout",
+					"Timed out while waiting for microphone capture to start.",
+				));
+			},
+		};
+
+		let recording = MicRecording { sample_rate, samples };
+		let mic = Self {
+			sample_rate,
+			stop_tx,
+			chunk_receiver,
+			current_chunk: None,
+			current_chunk_index: 0,
+		};
+
+		Ok((mic, recording))
+	}
+
+	pub fn sample_rate(&self) -> u32 {
+		self.sample_rate
+	}
+
+	pub async fn next_chunk(&mut self) -> Option<Vec<f32>> {
+		self.chunk_receiver.recv().await
+	}
+}
+
+impl Drop for MicStream {
+	fn drop(&mut self) {
+		let _ = self.stop_tx.send(());
+	}
+}
+
+impl Stream for MicStream {
+	type Item = f32;
+
+	fn poll_next(
+		mut self: Pin<&mut Self>,
+		cx: &mut std::task::Context<'_>,
+	) -> std::task::Poll<Option<Self::Item>> {
+		loop {
+			if let Some(chunk) = &self.current_chunk
+				&& self.current_chunk_index < chunk.len()
+			{
+				let sample = chunk[self.current_chunk_index];
+				self.current_chunk_index += 1;
+				return std::task::Poll::Ready(Some(sample));
+			}
+
+			self.current_chunk = None;
+			self.current_chunk_index = 0;
+
+			match self.chunk_receiver.poll_recv(cx) {
+				std::task::Poll::Ready(Some(chunk)) => {
+					self.current_chunk = Some(chunk);
+				},
+				std::task::Poll::Ready(None) => return std::task::Poll::Ready(None),
+				std::task::Poll::Pending => return std::task::Poll::Pending,
+			}
+		}
+	}
+}
+
+#[cfg(target_os = "macos")]
+fn start_mic_capture(
+	chunk_sender: mpsc::Sender<Vec<f32>>,
+	samples: Arc<Mutex<Vec<f32>>>,
+) -> Result<(u32, MacOsMicCapture), AppError> {
+	MacOsMicCapture::start(chunk_sender, samples)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn start_mic_capture(
+	_chunk_sender: mpsc::Sender<Vec<f32>>,
+	_samples: Arc<Mutex<Vec<f32>>>,
+) -> Result<(u32, NoopMicCapture), AppError> {
+	Err(AppError::new(
+		"microphone_unsupported",
+		"Microphone capture is currently only supported on macOS.",
+	))
+}
+
+#[cfg(not(target_os = "macos"))]
+struct NoopMicCapture;
+
+#[cfg(target_os = "macos")]
+struct MacOsMicCapture {
+	audio_queue: macos_audio::AudioQueueInstance,
+	_callback_state: Box<macos_audio::CallbackState>,
+}
+
+#[cfg(target_os = "macos")]
+impl MacOsMicCapture {
+	fn start(
+		chunk_sender: mpsc::Sender<Vec<f32>>,
+		samples: Arc<Mutex<Vec<f32>>>,
+	) -> Result<(u32, Self), AppError> {
+		let (sample_rate, audio_queue, callback_state) =
+			macos_audio::start_audio_queue_input(chunk_sender, samples)?;
+		Ok((sample_rate, Self { audio_queue, _callback_state: callback_state }))
+	}
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for MacOsMicCapture {
+	fn drop(&mut self) {
+		self.audio_queue.stop();
 	}
 }

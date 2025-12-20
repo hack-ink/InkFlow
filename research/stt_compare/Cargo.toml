@@ -18,7 +18,6 @@ vergen-gitcl = { workspace = true }
 # crates.io
 clap               = { workspace = true }
 color-eyre         = { workspace = true }
-cpal               = { workspace = true }
 hound              = { workspace = true }
 serde              = { workspace = true }
 toml               = { workspace = true }

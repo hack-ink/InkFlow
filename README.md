@@ -9,8 +9,9 @@ The generated native libraries are installed under `third_party/sherpa-onnx-pref
 
 Related docs:
 
-- `docs/air/stt_sherpa_onnx.md`: sherpa-onnx build + runtime notes.
-- `docs/air/stt_compare.md`: STT A/B harness usage.
+- `spec/50_speech_to_text.md`: sherpa-onnx build + runtime notes.
+- `spec/52_stt_dictation_pipeline_spec.md`: Canonical STT pipeline spec (two-pass + sliding-window refinement).
+- `spec/56_stt_comparison_harness.md`: STT A/B harness usage.
 
 Build sherpa-onnx native libraries and download the default model (macOS):
 

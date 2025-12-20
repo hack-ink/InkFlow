@@ -1,0 +1,51 @@
+# Application command permissions.
+
+[[permission]]
+commands.allow = ["session_dispatch"]
+description    = "Enables the session_dispatch command."
+identifier     = "allow-session-dispatch"
+
+[[permission]]
+commands.deny = ["session_dispatch"]
+description   = "Denies the session_dispatch command."
+identifier    = "deny-session-dispatch"
+
+[[permission]]
+commands.allow = ["settings_get"]
+description    = "Enables the settings_get command."
+identifier     = "allow-settings-get"
+
+[[permission]]
+commands.deny = ["settings_get"]
+description   = "Denies the settings_get command."
+identifier    = "deny-settings-get"
+
+[[permission]]
+commands.allow = ["settings_update"]
+description    = "Enables the settings_update command."
+identifier     = "allow-settings-update"
+
+[[permission]]
+commands.deny = ["settings_update"]
+description   = "Denies the settings_update command."
+identifier    = "deny-settings-update"
+
+[[permission]]
+commands.allow = ["platform_open_system_settings"]
+description    = "Enables the platform_open_system_settings command."
+identifier     = "allow-platform-open-system-settings"
+
+[[permission]]
+commands.deny = ["platform_open_system_settings"]
+description   = "Denies the platform_open_system_settings command."
+identifier    = "deny-platform-open-system-settings"
+
+[[permission]]
+commands.allow = ["overlay_set_height"]
+description    = "Enables the overlay_set_height command."
+identifier     = "allow-overlay-set-height"
+
+[[permission]]
+commands.deny = ["overlay_set_height"]
+description   = "Denies the overlay_set_height command."
+identifier    = "deny-overlay-set-height"

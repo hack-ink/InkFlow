@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for the overlay window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-overlay-set-height",
+    "allow-session-dispatch",
+    "allow-settings-get",
+    "allow-settings-update",
+    "allow-platform-open-system-settings"
+  ]
+}

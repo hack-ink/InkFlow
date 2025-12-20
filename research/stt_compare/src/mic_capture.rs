@@ -67,6 +67,16 @@ pub fn capture_to_temp_wav() -> Result<CapturedWav> {
 		return Err(eyre::eyre!("Microphone capture duration must be greater than zero."));
 	}
 
+	let mut sum_abs = 0.0f32;
+	let mut peak_abs = 0.0f32;
+	for sample in &samples {
+		let abs = sample.abs();
+		sum_abs += abs;
+		peak_abs = peak_abs.max(abs);
+	}
+	let mean_abs = sum_abs / samples.len() as f32;
+	println!("[info] mic_stats mean_abs={mean_abs:.6} peak_abs={peak_abs:.6}");
+
 	let duration_ms = crate::audio::samples_to_ms(samples.len(), sample_rate_hz).max(1);
 	let wav_path = temp_wav_path("stt_compare");
 

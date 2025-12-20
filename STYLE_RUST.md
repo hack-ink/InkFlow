@@ -60,7 +60,7 @@ src/foo/bar.rs
 src/foo/baz.rs
 ```
 
-Never create or modify `mod.rs`.
+Never create `mod.rs`.
 
 ---
 

@@ -23,7 +23,6 @@ anyhow                       = { version = "1.0" }
 bindgen                      = { version = "0.72", default-features = false, features = ["runtime"] }
 clap                         = { version = "4.5", features = ["derive"] }
 color-eyre                   = { version = "0.6" }
-cpal                         = { version = "0.16" }
 futures-util                 = { version = "0.3" }
 hound                        = { version = "3.5" }
 libloading                   = { version = "0.9" }
@@ -31,6 +30,7 @@ log                          = { version = "0.4" }
 objc2                        = { version = "0.6" }
 objc2-app-kit                = { version = "0.3", default-features = false }
 reqwest                      = { version = "0.12", features = ["json"] }
+rig                          = { package = "rig-core", version = "0.27" }
 serde                        = { version = "1.0", features = ["derive"] }
 serde_json                   = { version = "1.0" }
 tauri                        = { version = "2.9" }
