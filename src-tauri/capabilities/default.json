@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "liquid-glass:default",
     "allow-overlay-set-height",
     "allow-session-dispatch",
     "allow-settings-get",

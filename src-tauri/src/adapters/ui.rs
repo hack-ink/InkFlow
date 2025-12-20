@@ -42,10 +42,35 @@ impl UiPort for UiAdapter {
 			return;
 		};
 
-		if let (Ok(size), Ok(scale_factor)) = (window.inner_size(), window.scale_factor()) {
-			let height = (crate::overlay::COLLAPSED_HEIGHT_LOGICAL * scale_factor).round() as u32;
-			if let Err(err) = window.set_size(tauri::PhysicalSize::new(size.width, height)) {
-				eprintln!("Failed to reset the overlay window size: {err}.");
+		#[cfg(target_os = "macos")]
+		{
+			let result = window.with_webview(move |webview| unsafe {
+				use objc2_app_kit::NSWindow;
+
+				let ns_window: &NSWindow = &*webview.ns_window().cast();
+				let mut frame = ns_window.frame();
+				let start_height = frame.size.height;
+				let target_height = crate::overlay::COLLAPSED_HEIGHT_LOGICAL;
+				if (start_height - target_height).abs() < 0.5 {
+					return;
+				}
+
+				frame.origin.y += start_height - target_height;
+				frame.size.height = target_height;
+				ns_window.setFrame_display_animate(frame, true, true);
+			});
+			if let Err(err) = result {
+				eprintln!("Failed to reset the overlay window height: {err}.");
+			}
+		}
+
+		#[cfg(not(target_os = "macos"))]
+		{
+			if let (Ok(size), Ok(scale_factor)) = (window.inner_size(), window.scale_factor()) {
+				let height = (crate::overlay::COLLAPSED_HEIGHT_LOGICAL * scale_factor).round() as u32;
+				if let Err(err) = window.set_size(tauri::PhysicalSize::new(size.width, height)) {
+					eprintln!("Failed to reset the overlay window size: {err}.");
+				}
 			}
 		}
 

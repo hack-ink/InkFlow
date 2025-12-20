@@ -27,6 +27,7 @@ serde                        = { workspace = true }
 serde_json                   = { workspace = true }
 hound                        = { workspace = true }
 tauri                        = { workspace = true, features = ["macos-private-api"] }
+tauri-plugin-liquid-glass    = "0.1"
 tauri-plugin-global-shortcut = { workspace = true }
 tauri-plugin-log             = { workspace = true }
 tokio                        = { workspace = true }

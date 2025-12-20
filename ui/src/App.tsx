@@ -1,25 +1,32 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion, type Variants } from "framer-motion";
 import { Settings2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { setLiquidGlassEffect } from "tauri-plugin-liquid-glass-api";
 
 const COLLAPSED_HEIGHT = 64;
-
+const SETTINGS_PANEL_HEIGHT = 360;
+const EXPANDED_HEIGHT = COLLAPSED_HEIGHT + SETTINGS_PANEL_HEIGHT;
+const SETTINGS_PANEL_OPEN_MS = 260;
+const SETTINGS_PANEL_CLOSE_MS = 220;
 const SETTINGS_PANEL_VARIANTS: Variants = {
   closed: {
-    height: 0,
+    maxHeight: 0,
     opacity: 0,
-    transition: { duration: 0.24, ease: [0.32, 0, 0.67, 0] },
+    y: -8,
+    transition: { duration: SETTINGS_PANEL_CLOSE_MS / 1000, ease: [0.4, 0, 0.2, 1] },
   },
   open: {
-    height: "auto",
+    maxHeight: SETTINGS_PANEL_HEIGHT,
     opacity: 1,
+    y: 0,
     transition: {
-      duration: 0.38,
+      duration: SETTINGS_PANEL_OPEN_MS / 1000,
       ease: [0.22, 1, 0.36, 1],
       when: "beforeChildren",
-      staggerChildren: 0.06,
+      delayChildren: 0.04,
+      staggerChildren: 0.04,
     },
   },
 };
@@ -29,7 +36,7 @@ const SETTINGS_ITEM_VARIANTS: Variants = {
   open: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.22, ease: [0.2, 1, 0.2, 1] },
   },
 };
 
@@ -247,11 +254,37 @@ function App() {
   const sttRevisionRef = useRef<number>(0);
   const lastRawTextRef = useRef<string>("");
   const pttActiveRef = useRef<boolean>(false);
-  const settingsOpenRef = useRef<boolean>(false);
   const engineStateRef = useRef<EngineState>("ready");
-  const settingsPanelRef = useRef<HTMLDivElement | null>(null);
-  const lastOverlayHeightRef = useRef<number>(COLLAPSED_HEIGHT);
-  const resizeRafRef = useRef<number | null>(null);
+  const resizeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const applySystemGlass = async () => {
+      try {
+        if (!navigator.userAgent.includes("Mac")) {
+          return;
+        }
+
+        if (disposed) {
+          return;
+        }
+
+        await setLiquidGlassEffect({ cornerRadius: 16 });
+        if (!disposed) {
+          document.documentElement.dataset.glass = "system";
+        }
+      } catch (err: unknown) {
+        console.warn("Failed to apply system glass effect.", err);
+      }
+    };
+
+    void applySystemGlass();
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -427,10 +460,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    settingsOpenRef.current = settingsOpen;
-  }, [settingsOpen]);
-
-  useEffect(() => {
     engineStateRef.current = engineState;
   }, [engineState]);
 
@@ -485,40 +514,33 @@ function App() {
   }, [settingsOpen]);
 
   useEffect(() => {
-    if (!settingsOpen) return;
+    const targetHeight = settingsOpen ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
+    if (resizeTimeoutRef.current != null) {
+      window.clearTimeout(resizeTimeoutRef.current);
+      resizeTimeoutRef.current = null;
+    }
 
-    const panel = settingsPanelRef.current;
-    if (!panel) return;
-
-    const requestResize = (animate: boolean) => {
-      if (resizeRafRef.current != null) {
-        cancelAnimationFrame(resizeRafRef.current);
-      }
-
-      resizeRafRef.current = requestAnimationFrame(() => {
-        resizeRafRef.current = null;
-        const target = Math.max(COLLAPSED_HEIGHT, Math.round(COLLAPSED_HEIGHT + panel.scrollHeight));
-        if (Math.abs(target - lastOverlayHeightRef.current) < 1) return;
-        lastOverlayHeightRef.current = target;
-
-        void invoke("overlay_set_height", { height: target, animate }).catch((err: unknown) => {
-          console.warn("Failed to resize the overlay window.", err);
-        });
+    if (settingsOpen) {
+      void invoke("overlay_set_height", { height: targetHeight, animate: false }).catch((err: unknown) => {
+        console.warn("Failed to resize the overlay window.", err);
       });
-    };
+      return;
+    }
 
-    requestResize(true);
-    const observer = new ResizeObserver(() => requestResize(false));
-    observer.observe(panel);
+    resizeTimeoutRef.current = window.setTimeout(() => {
+      void invoke("overlay_set_height", { height: targetHeight, animate: false }).catch((err: unknown) => {
+        console.warn("Failed to resize the overlay window.", err);
+      });
+    }, SETTINGS_PANEL_CLOSE_MS);
+  }, [settingsOpen]);
 
+  useEffect(() => {
     return () => {
-      observer.disconnect();
-      if (resizeRafRef.current != null) {
-        cancelAnimationFrame(resizeRafRef.current);
-        resizeRafRef.current = null;
+      if (resizeTimeoutRef.current != null) {
+        window.clearTimeout(resizeTimeoutRef.current);
       }
     };
-  }, [settingsOpen]);
+  }, []);
 
   const onSaveSettings = async () => {
     setSettingsSaving(true);
@@ -620,98 +642,79 @@ function App() {
   }, [displayText, engineReason, engineState, error, reason]);
 
   return (
-    <div className="h-full w-full">
-      <motion.div
-        initial={{ opacity: 0, y: 12, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 380, damping: 34 }}
-        className="relative isolate h-full w-full transform-gpu overflow-hidden rounded-2xl bg-white/[0.06] ring-1 ring-white/15 shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-      >
-        <div className="pointer-events-none absolute inset-0 opacity-60 [background:radial-gradient(900px_circle_at_18%_-10%,rgba(255,255,255,0.26),transparent_55%),radial-gradient(700px_circle_at_110%_20%,rgba(255,255,255,0.18),transparent_55%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-20 [background:linear-gradient(to_bottom,rgba(255,255,255,0.18),transparent_38%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%224%22%20height=%224%22%3E%3Cpath%20d=%22M0%200h1v1H0zM2%202h1v1H2z%22%20fill=%22%23ffffff%22/%3E%3C/svg%3E')]" />
+    <MotionConfig reducedMotion="never">
+      <div className="h-full w-full">
+        <div className="glass-shell h-full w-full transform-gpu rounded-2xl">
+          <div className="glass-content relative h-full w-full">
+            <div className="relative z-10 flex h-16 items-center gap-3 px-5">
+              <motion.div
+                animate={sessionState === "Listening" ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+                transition={{ duration: 1.2, repeat: sessionState === "Listening" ? Infinity : 0 }}
+                className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_6px_rgba(52,211,153,0.12)]"
+              />
 
-        <div className="flex h-full w-full flex-col">
-          <div className="flex h-16 items-center gap-3 px-5">
-            <motion.div
-              animate={sessionState === "Listening" ? { scale: [1, 1.25, 1] } : { scale: 1 }}
-              transition={{ duration: 1.2, repeat: sessionState === "Listening" ? Infinity : 0 }}
-              className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_6px_rgba(52,211,153,0.12)]"
-            />
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center">
-                <div className="truncate text-[15px] leading-5 text-white/90">
-                  {displayText.trim().length > 0 ? (
-                    <>
-                      <span>{prefix}</span>
-                      {delta ? (
-                        <motion.span
-                          key={`${sessionId ?? "none"}:${sttRevisionRef.current}`}
-                          initial={{ opacity: 0, filter: "blur(4px)" }}
-                          animate={{ opacity: 1, filter: "blur(0px)" }}
-                          transition={{ duration: 0.18 }}
-                          className="rounded-md bg-white/10 px-1 py-0.5"
-                        >
-                          {delta}
-                        </motion.span>
-                      ) : null}
-                    </>
-                  ) : error ? (
-                    <span className="text-red-100/90">{displayLine}</span>
-                  ) : (
-                    <span className="text-white/55">{displayLine}</span>
-                  )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center">
+                  <div className="truncate text-[15px] leading-5 text-white/90">
+                    {displayText.trim().length > 0 ? (
+                      <>
+                        <span className="glass-contrast-text">{prefix}</span>
+                        {delta ? (
+                          <motion.span
+                            key={`${sessionId ?? "none"}:${sttRevisionRef.current}`}
+                            initial={{ opacity: 0, filter: "blur(4px)" }}
+                            animate={{ opacity: 1, filter: "blur(0px)" }}
+                            transition={{ duration: 0.18 }}
+                            className="rounded-md bg-white/10 px-1 py-0.5"
+                          >
+                            <span className="glass-contrast-text">{delta}</span>
+                          </motion.span>
+                        ) : null}
+                      </>
+                    ) : error ? (
+                      <span className="text-red-100/90">{displayLine}</span>
+                    ) : (
+                      <span className="glass-contrast-text text-white/55">{displayLine}</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {sessionState === "RewriteReady" ? (
+              {sessionState === "RewriteReady" ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void invoke("session_dispatch", { action: { type: "rewrite" } satisfies SessionAction })
+                  }
+                  className="glass-button h-8 px-3 text-xs"
+                >
+                  <span className="glass-contrast-text">Rewrite</span>
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                onClick={() =>
-                  void invoke("session_dispatch", { action: { type: "rewrite" } satisfies SessionAction })
-                }
-                className="h-8 rounded-xl bg-white/10 px-3 text-xs text-white/85 ring-1 ring-white/10 hover:bg-white/15"
+                onClick={() => setSettingsOpen((open) => !open)}
+                className={`glass-icon-button ${settingsOpen ? "glass-icon-button--active" : ""}`}
+                aria-label="Toggle settings"
+                aria-expanded={settingsOpen}
               >
-                Rewrite
+                <Settings2 className="glass-contrast-text h-4 w-4" />
               </button>
-            ) : null}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setSettingsOpen((open) => !open)}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/70 ring-1 ring-white/10 hover:bg-white/10 hover:text-white/90 ${
-                settingsOpen ? "bg-white/10 text-white/90" : ""
-              }`}
-              aria-label="Toggle settings"
-              aria-expanded={settingsOpen}
-            >
-              <Settings2 className="h-4 w-4" />
-            </button>
-          </div>
-
-          <AnimatePresence
-            initial={false}
-            onExitComplete={() => {
-              if (settingsOpenRef.current) return;
-              lastOverlayHeightRef.current = COLLAPSED_HEIGHT;
-              void invoke("overlay_set_height", { height: COLLAPSED_HEIGHT, animate: true }).catch((err: unknown) => {
-                console.warn("Failed to resize the overlay window.", err);
-              });
-            }}
-          >
-            {settingsOpen ? (
-              <motion.div
-                key="settings"
-                ref={settingsPanelRef}
-                variants={SETTINGS_PANEL_VARIANTS}
-                initial="closed"
-                animate="open"
-                exit="closed"
-                className="overflow-hidden"
-              >
-                <div className="border-t border-white/10 px-5 pb-4 pt-3">
+            <AnimatePresence>
+              {settingsOpen ? (
+                <motion.div
+                  key="settings"
+                  variants={SETTINGS_PANEL_VARIANTS}
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  className="glass-panel absolute left-0 right-0 top-16 overflow-hidden border-t border-white/10"
+                  style={{ height: SETTINGS_PANEL_HEIGHT }}
+                >
+                  <div className="h-full overflow-y-auto px-5 pb-4 pt-3">
                   {error ? (
                     <motion.div
                       variants={SETTINGS_ITEM_VARIANTS}
@@ -723,7 +726,7 @@ function App() {
                         <button
                           type="button"
                           onClick={onOpenMicrophoneSettings}
-                          className="mt-2 rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+                          className="glass-button mt-2 rounded-lg px-3 py-1.5 text-xs"
                         >
                           Open Microphone Settings
                         </button>
@@ -732,7 +735,7 @@ function App() {
                         <button
                           type="button"
                           onClick={onOpenAccessibilitySettings}
-                          className="mt-2 rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+                          className="glass-button mt-2 rounded-lg px-3 py-1.5 text-xs"
                         >
                           Open Accessibility Settings
                         </button>
@@ -742,21 +745,21 @@ function App() {
 
                   <motion.div variants={SETTINGS_ITEM_VARIANTS} className="mt-1 grid grid-cols-2 gap-3">
                     <label className="block">
-                      <div className="text-[11px] uppercase tracking-wide text-white/50">Base URL</div>
+                      <div className="glass-label glass-contrast-text">Base URL</div>
                       <input
                         value={baseUrlDraft}
                         onChange={(e) => setBaseUrlDraft(e.target.value)}
                         placeholder="https://api.openai.com/v1"
-                        className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                        className="glass-input"
                       />
                     </label>
                     <label className="block">
-                      <div className="text-[11px] uppercase tracking-wide text-white/50">Model</div>
+                      <div className="glass-label glass-contrast-text">Model</div>
                       <input
                         value={modelDraft}
                         onChange={(e) => setModelDraft(e.target.value)}
                         placeholder="gpt-4o-mini"
-                        className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                        className="glass-input"
                       />
                     </label>
                   </motion.div>
@@ -764,51 +767,59 @@ function App() {
                   <motion.div variants={SETTINGS_ITEM_VARIANTS}>
                     <label className="block">
                       <div className="flex items-center justify-between">
-                        <div className="text-[11px] uppercase tracking-wide text-white/50">API key</div>
-                        <div className="text-[11px] text-white/50">{settings?.llm.has_api_key ? "Saved" : "Not set"}</div>
+                        <div className="glass-label glass-contrast-text">API key</div>
+                        <div className="glass-meta glass-contrast-text">
+                          {settings?.llm.has_api_key ? "Saved" : "Not set"}
+                        </div>
                       </div>
                       <input
                         value={apiKeyDraft}
                         onChange={(e) => setApiKeyDraft(e.target.value)}
                         placeholder="sk-..."
-                        className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                        className="glass-input"
                       />
                       <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
                         <input type="checkbox" checked={clearApiKey} onChange={(e) => setClearApiKey(e.target.checked)} />
-                        Clear the stored API key.
+                        <span className="glass-contrast-text">Clear the stored API key.</span>
                       </label>
                     </label>
                   </motion.div>
 
                   <motion.div variants={SETTINGS_ITEM_VARIANTS}>
                     <details className="group">
-                      <summary className="cursor-pointer text-xs text-white/70">Advanced</summary>
+                      <summary className="glass-summary glass-contrast-text cursor-pointer">Advanced</summary>
                       <div className="mt-3 space-y-3">
                         <label className="block">
-                          <div className="text-[11px] uppercase tracking-wide text-white/50">Temperature</div>
+                          <div className="glass-label glass-contrast-text">
+                            Temperature
+                          </div>
                           <input
                             value={temperatureDraft}
                             onChange={(e) => setTemperatureDraft(e.target.value)}
                             inputMode="decimal"
-                            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                            className="glass-input"
                           />
                         </label>
                         <label className="block">
-                          <div className="text-[11px] uppercase tracking-wide text-white/50">Silence timeout (ms)</div>
+                          <div className="glass-label glass-contrast-text">
+                            Silence timeout (ms)
+                          </div>
                           <input
                             value={silenceTimeoutDraft}
                             onChange={(e) => setSilenceTimeoutDraft(e.target.value)}
                             inputMode="numeric"
-                            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                            className="glass-input"
                           />
                         </label>
                         <label className="block">
-                          <div className="text-[11px] uppercase tracking-wide text-white/50">System prompt</div>
+                          <div className="glass-label glass-contrast-text">
+                            System prompt
+                          </div>
                           <textarea
                             value={systemPromptDraft}
                             onChange={(e) => setSystemPromptDraft(e.target.value)}
                             rows={5}
-                            className="mt-1 w-full resize-none rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                            className="glass-textarea"
                           />
                         </label>
                       </div>
@@ -817,83 +828,99 @@ function App() {
 
                   <motion.div variants={SETTINGS_ITEM_VARIANTS}>
                     <details className="group">
-                      <summary className="cursor-pointer text-xs text-white/70">Speech engine</summary>
+                      <summary className="glass-summary glass-contrast-text cursor-pointer">Speech engine</summary>
                       <div className="mt-3 space-y-4">
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Sherpa model dir</div>
+                            <div className="glass-label glass-contrast-text">
+                              Sherpa model dir
+                            </div>
                             <input
                               value={sherpaModelDirDraft}
                               onChange={(e) => setSherpaModelDirDraft(e.target.value)}
                               placeholder="Auto"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Sherpa provider</div>
+                            <div className="glass-label glass-contrast-text">
+                              Sherpa provider
+                            </div>
                             <input
                               value={sherpaProviderDraft}
                               onChange={(e) => setSherpaProviderDraft(e.target.value)}
                               placeholder="cpu"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Sherpa threads</div>
+                            <div className="glass-label glass-contrast-text">
+                              Sherpa threads
+                            </div>
                             <input
                               value={sherpaThreadsDraft}
                               onChange={(e) => setSherpaThreadsDraft(e.target.value)}
                               inputMode="numeric"
                               placeholder="Default"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Sherpa chunk (ms)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Sherpa chunk (ms)
+                            </div>
                             <input
                               value={sherpaChunkMsDraft}
                               onChange={(e) => setSherpaChunkMsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Whisper model path</div>
+                            <div className="glass-label glass-contrast-text">
+                              Whisper model path
+                            </div>
                             <input
                               value={whisperModelPathDraft}
                               onChange={(e) => setWhisperModelPathDraft(e.target.value)}
                               placeholder="Auto"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Whisper language</div>
+                            <div className="glass-label glass-contrast-text">
+                              Whisper language
+                            </div>
                             <input
                               value={whisperLanguageDraft}
                               onChange={(e) => setWhisperLanguageDraft(e.target.value)}
                               placeholder="en, zh, auto"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Whisper threads</div>
+                            <div className="glass-label glass-contrast-text">
+                              Whisper threads
+                            </div>
                             <input
                               value={whisperThreadsDraft}
                               onChange={(e) => setWhisperThreadsDraft(e.target.value)}
                               inputMode="numeric"
                               placeholder="Default"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Whisper GPU</div>
+                            <div className="glass-label glass-contrast-text">
+                              Whisper GPU
+                            </div>
                             <select
                               value={whisperGpuDraft}
                               onChange={(e) => setWhisperGpuDraft(e.target.value)}
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-select"
                             >
                               <option value="default">Default</option>
                               <option value="on">Force on</option>
@@ -908,110 +935,132 @@ function App() {
                             checked={windowEnabledDraft}
                             onChange={(e) => setWindowEnabledDraft(e.target.checked)}
                           />
-                          Enable sliding-window refinement.
+                          <span className="glass-contrast-text">Enable sliding-window refinement.</span>
                         </label>
 
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Window (ms)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Window (ms)
+                            </div>
                             <input
                               value={windowMsDraft}
                               onChange={(e) => setWindowMsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Step (ms)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Step (ms)
+                            </div>
                             <input
                               value={windowStepMsDraft}
                               onChange={(e) => setWindowStepMsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Context (ms)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Context (ms)
+                            </div>
                             <input
                               value={windowContextMsDraft}
                               onChange={(e) => setWindowContextMsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Min mean abs</div>
+                            <div className="glass-label glass-contrast-text">
+                              Min mean abs
+                            </div>
                             <input
                               value={windowMinMeanAbsDraft}
                               onChange={(e) => setWindowMinMeanAbsDraft(e.target.value)}
                               inputMode="decimal"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Emit every</div>
+                            <div className="glass-label glass-contrast-text">
+                              Emit every
+                            </div>
                             <input
                               value={windowEmitEveryDraft}
                               onChange={(e) => setWindowEmitEveryDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Window best_of</div>
+                            <div className="glass-label glass-contrast-text">
+                              Window best_of
+                            </div>
                             <input
                               value={windowBestOfDraft}
                               onChange={(e) => setWindowBestOfDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Second-pass best_of</div>
+                            <div className="glass-label glass-contrast-text">
+                              Second-pass best_of
+                            </div>
                             <input
                               value={secondPassBestOfDraft}
                               onChange={(e) => setSecondPassBestOfDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Stable ticks</div>
+                            <div className="glass-label glass-contrast-text">
+                              Stable ticks
+                            </div>
                             <input
                               value={stableTicksDraft}
                               onChange={(e) => setStableTicksDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Rollback threshold</div>
+                            <div className="glass-label glass-contrast-text">
+                              Rollback threshold
+                            </div>
                             <input
                               value={rollbackThresholdDraft}
                               onChange={(e) => setRollbackThresholdDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Overlap K (words)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Overlap K (words)
+                            </div>
                             <input
                               value={overlapWordsDraft}
                               onChange={(e) => setOverlapWordsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                           <label className="block">
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">Overlap K (chars)</div>
+                            <div className="glass-label glass-contrast-text">
+                              Overlap K (chars)
+                            </div>
                             <input
                               value={overlapCharsDraft}
                               onChange={(e) => setOverlapCharsDraft(e.target.value)}
                               inputMode="numeric"
-                              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/90 outline-none focus:border-white/25"
+                              className="glass-input"
                             />
                           </label>
                         </div>
@@ -1024,18 +1073,19 @@ function App() {
                       type="button"
                       onClick={onSaveSettings}
                       disabled={settingsSaving}
-                      className="rounded-xl bg-white/15 px-4 py-2 text-xs font-medium text-white hover:bg-white/20 disabled:opacity-60"
+                      className="glass-button glass-button--primary px-4 py-2 text-xs font-medium disabled:opacity-60"
                     >
-                      {settingsSaving ? "Saving..." : "Save"}
+                      <span className="glass-contrast-text">{settingsSaving ? "Saving..." : "Save"}</span>
                     </button>
                   </motion.div>
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </MotionConfig>
   );
 }
 

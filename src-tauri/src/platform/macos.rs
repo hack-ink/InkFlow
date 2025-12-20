@@ -50,6 +50,7 @@ impl Platform for MacOsPlatform {
 						disable_scroll_bars(scroll_view);
 					}
 				}
+
 			})
 			.map_err(|err| {
 				AppError::new(

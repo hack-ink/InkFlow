@@ -25,6 +25,7 @@ use crate::{app_state::AppState, session::SessionAction};
 pub fn run() {
 	if let Err(err) = tauri::Builder::default()
 		.manage(AppState::new())
+		.plugin(tauri_plugin_liquid_glass::init())
 		.invoke_handler(tauri::generate_handler![
 			commands::overlay_set_height,
 			commands::session_dispatch,
