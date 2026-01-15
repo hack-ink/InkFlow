@@ -9,34 +9,35 @@ const COLLAPSED_HEIGHT = 64;
 const SETTINGS_PANEL_HEIGHT = 360;
 const EXPANDED_HEIGHT = COLLAPSED_HEIGHT + SETTINGS_PANEL_HEIGHT;
 const SETTINGS_PANEL_OPEN_MS = 260;
-const SETTINGS_PANEL_CLOSE_MS = 220;
+const SETTINGS_PANEL_CLOSE_MS = 260;
 const SETTINGS_PANEL_VARIANTS: Variants = {
   closed: {
-    maxHeight: 0,
-    opacity: 0,
+    height: 0,
+    opacity: 1,
     y: -8,
-    transition: { duration: SETTINGS_PANEL_CLOSE_MS / 1000, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: SETTINGS_PANEL_CLOSE_MS / 1000, ease: [0.22, 1, 0.36, 1] },
   },
   open: {
-    maxHeight: SETTINGS_PANEL_HEIGHT,
+    height: SETTINGS_PANEL_HEIGHT,
     opacity: 1,
     y: 0,
     transition: {
       duration: SETTINGS_PANEL_OPEN_MS / 1000,
       ease: [0.22, 1, 0.36, 1],
-      when: "beforeChildren",
-      delayChildren: 0.04,
-      staggerChildren: 0.04,
     },
   },
 };
 
 const SETTINGS_ITEM_VARIANTS: Variants = {
-  closed: { opacity: 0, y: -6 },
+  closed: {
+    opacity: 0,
+    y: -6,
+    transition: { duration: SETTINGS_PANEL_CLOSE_MS / 1000, ease: [0.22, 1, 0.36, 1] },
+  },
   open: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.22, ease: [0.2, 1, 0.2, 1] },
+    transition: { duration: SETTINGS_PANEL_OPEN_MS / 1000, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -255,6 +256,8 @@ function App() {
   const lastRawTextRef = useRef<string>("");
   const pttActiveRef = useRef<boolean>(false);
   const engineStateRef = useRef<EngineState>("ready");
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef<boolean>(true);
   const resizeTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -641,6 +644,28 @@ function App() {
     return "Hold Space to talk, and release to stop. Press Enter to inject.";
   }, [displayText, engineReason, engineState, error, reason]);
 
+  const updateTranscriptScrollState = () => {
+    const node = transcriptRef.current;
+    if (!node) {
+      return;
+    }
+
+    const atEnd = node.scrollWidth - node.scrollLeft - node.clientWidth <= 4;
+    shouldAutoScrollRef.current = atEnd;
+  };
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (!node) {
+      return;
+    }
+
+    if (shouldAutoScrollRef.current) {
+      node.scrollLeft = node.scrollWidth;
+    }
+    updateTranscriptScrollState();
+  }, [displayLine, delta]);
+
   return (
     <MotionConfig reducedMotion="never">
       <div className="h-full w-full">
@@ -654,8 +679,13 @@ function App() {
               />
 
               <div className="min-w-0 flex-1">
-                <div className="flex items-center">
-                  <div className="truncate text-[15px] leading-5 text-white/90">
+                <div className="flex h-8 items-center">
+                  <div
+                    ref={transcriptRef}
+                    onScroll={updateTranscriptScrollState}
+                    className="glass-transcript-scroll-x h-full text-[15px] leading-5 text-white/90"
+                    title={displayLine}
+                  >
                     {displayText.trim().length > 0 ? (
                       <>
                         <span className="glass-contrast-text">{prefix}</span>
@@ -712,7 +742,6 @@ function App() {
                   animate="open"
                   exit="closed"
                   className="glass-panel absolute left-0 right-0 top-16 overflow-hidden border-t border-white/10"
-                  style={{ height: SETTINGS_PANEL_HEIGHT }}
                 >
                   <div className="h-full overflow-y-auto px-5 pb-4 pt-3">
                   {error ? (

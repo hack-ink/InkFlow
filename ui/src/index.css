@@ -122,6 +122,15 @@ body {
   .glass-panel {
     background: transparent;
   }
+
+  .glass-transcript-scroll-x {
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overflow-wrap: anywhere;
+    white-space: nowrap;
+  }
 }
 
 *::-webkit-scrollbar {
