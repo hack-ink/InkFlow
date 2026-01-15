@@ -52,7 +52,7 @@ args = [
 workspace = false
 command = "bash"
 args = [
-	"script/setup_macos.sh",
+	"scripts/setup_macos.sh",
 ]
 
 [tasks.release]

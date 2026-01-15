@@ -2,26 +2,34 @@
 
 Purpose: Provide the canonical entry point and reading order for repository documentation.
 
-## Start here
+Audience: Engineers and LLMs reading the repository.
 
-- `AGENTS.md` for automated agent rules and tooling constraints.
-- `docs/governance.md` for documentation structure and update rules.
-- `docs/spec/index.md` for normative system specifications and contracts.
-- `docs/guide/index.md` for operational guides and runbooks.
+## How to use this index
 
-## Current documentation
+- Read `AGENTS.md` first for tooling and scope constraints.
+- Use `docs/spec/index.md` for contracts and system behavior.
+- Use `docs/guide/index.md` for procedures, troubleshooting, and operational guidance.
+- Use `docs/governance.md` for documentation rules and placement.
+- If a referenced document does not exist, state that it is missing.
+
+## Reading order
+
+1. `AGENTS.md`
+2. `docs/governance.md`
+3. `docs/spec/index.md`
+4. `docs/guide/index.md`
+
+## Document sets
 
 ### Specifications (normative)
 
 - Location: `docs/spec/`.
-- Entry point: `docs/spec/index.md`.
-- Scope: Architecture notes, implementation workflows, and STT specifications.
+- Scope: Architecture, contracts, and STT specifications.
 
 ### Operational guides
 
 - Location: `docs/guide/`.
-- Entry point: `docs/guide/index.md`.
-- Current guide: `docs/guide/rust_style_guide.md`.
+- Scope: Setup, debugging, and testing runbooks.
 
 ### Governance
 

@@ -34,12 +34,12 @@ SHERPA_C_API_DYLIB="$SHERPA_LIB_DIR/libsherpa-onnx-c-api.dylib"
 ORT_DYLIB="$SHERPA_LIB_DIR/libonnxruntime.dylib"
 
 MODEL_NAME="sherpa-onnx-streaming-zipformer-en-2023-06-21"
-MODEL_DIR="$ROOT_DIR/model/$MODEL_NAME"
-MODEL_TARBALL="$ROOT_DIR/model/$MODEL_NAME.tar.bz2"
+MODEL_DIR="$ROOT_DIR/models/$MODEL_NAME"
+MODEL_TARBALL="$ROOT_DIR/models/$MODEL_NAME.tar.bz2"
 MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
 
 WHISPER_MODEL_NAME="ggml-large-v3-turbo-q8_0.bin"
-WHISPER_MODEL_DIR="$ROOT_DIR/model/whisper"
+WHISPER_MODEL_DIR="$ROOT_DIR/models/whisper"
 WHISPER_MODEL_PATH="$WHISPER_MODEL_DIR/$WHISPER_MODEL_NAME"
 
 echo "Setting up sherpa-onnx (C API) and the default streaming model."
@@ -150,7 +150,7 @@ else
   echo "Downloading model: $MODEL_NAME."
   curl -L --fail "$MODEL_URL" -o "$MODEL_TARBALL"
 
-  echo "Extracting model to model/."
+  echo "Extracting model to models/."
   tar -xjf "$MODEL_TARBALL" -C "$ROOT_DIR/model"
   rm -f "$MODEL_TARBALL"
 fi

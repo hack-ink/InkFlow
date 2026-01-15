@@ -2,7 +2,7 @@
 
 Date: 2025-12-17
 
-This document records the implementation work done to align AiR with `docs/spec/stt_dictation_pipeline_spec.md`.
+This document records the implementation work done to align AiR with `docs/spec/stt_dictation_pipeline.md`.
 It is intended as a compact, developer-facing log that can be used to recover context in a future session.
 
 ## What Was Implemented
@@ -87,7 +87,7 @@ Code anchors:
 - A finalized dictation session writes:
   - `stt_session_<SESSION_ID>.ndjson` (event trace).
   - `stt_session_<SESSION_ID>.wav` (recorded audio).
-- Workflow notes: `docs/spec/stt_dictation_pipeline_debugging.md`.
+- Workflow notes: `docs/guide/testing/stt_dictation_pipeline_debugging.md`.
 
 ## Known Limitations / Future Work
 

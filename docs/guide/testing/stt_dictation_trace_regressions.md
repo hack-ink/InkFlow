@@ -70,9 +70,9 @@ Code anchor: `src-tauri/src/session.rs`.
 
 1. Run: `cargo make dev-trace`.
 2. Record a few PTT sessions.
-3. Inspect `tmp/stt_trace/stt_session_*.ndjson` using: `python3 script/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --timeline`.
-   - For a full event timeline, use `--events`: `python3 script/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --events`.
-4. If you need a capture workflow reference, see `docs/spec/stt_dictation_pipeline_debugging.md`.
+3. Inspect `tmp/stt_trace/stt_session_*.ndjson` using: `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --timeline`.
+   - For a full event timeline, use `--events`: `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --events`.
+4. If you need a capture workflow reference, see `docs/guide/testing/stt_dictation_pipeline_debugging.md`.
 
 ## Regression Checks
 

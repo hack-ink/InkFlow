@@ -1,14 +1,46 @@
 # STT Dictation Pipeline Spec (Canonical v2)
 
-This document is a single, comprehensive specification of AiR’s dictation STT pipeline:
+Purpose: Define the canonical dictation pipeline for AiR.
+
+Audience: Engineers and LLMs reading the system specification.
+
+Scope: End-to-end dictation behavior, including streaming partials, live refinement, and finalization.
+
+This document is a single, comprehensive specification of AiR's dictation STT pipeline:
 
 - **sherpa-onnx streaming** for low-latency partials and endpoint detection.
 - **Whisper sliding-window decoding** in parallel during PTT to refine the live transcript while speaking.
 - **Whisper second-pass decoding** on each endpoint (and on forced-finalize) to finalize segment text.
 
-This spec is implementation-oriented and code-referenced. The **code remains the source of truth**, and this document must be updated when behavior changes.
+This spec is implementation-oriented and code-referenced. The code remains the source of truth, and this document must be updated when behavior changes.
 
 ---
+
+## Goals and non-goals
+
+### Goals
+
+- Provide low-latency live dictation while the user is speaking.
+- Improve live text quality via Whisper sliding-window refinement.
+- Preserve fast finalization semantics with Whisper second pass per endpoint.
+- Avoid UI duplication bugs (for example, repeated short phrases during silence).
+- Keep the existing UI event contract stable (`stt/partial`, `stt/final`).
+- Keep performance and quality knobs adjustable from the UI.
+
+### Non-goals
+
+- Do not introduce a second Whisper context instance.
+- Do not change the UI state machine or keybindings unless required for correctness.
+- Do not change the STT comparison harness to match app behavior.
+
+## Glossary
+
+- **PTT**: Push-to-talk. Holding Space starts dictation; releasing Space triggers finalization.
+- **Partial**: A non-final transcript update emitted while audio is still incoming.
+- **Endpoint**: A detected speech boundary (typically trailing silence).
+- **Segment**: A contiguous audio region between endpoints.
+- **Two-pass**: sherpa streaming for partials plus Whisper for endpoint finalization.
+- **Sliding-window**: Repeatedly decoding the last N seconds of audio every M milliseconds to refine live text.
 
 ## 0. Implementation Status (Code vs Spec)
 
@@ -16,17 +48,24 @@ This document specifies the target architecture. Some parts already exist in cod
 
 ### Implemented today (baseline)
 
-- Sherpa-onnx streaming partials and endpoint detection.- Segment-based transcript model (`stt_segments` + `stt_live_text`) and revision-ordered `stt/partial` events.
+- Sherpa-onnx streaming partials and endpoint detection.
+- Segment-based transcript model (`stt_segments` + `stt_live_text`) and revision-ordered `stt/partial` events.
 - Whisper second pass on each endpoint that replaces the provisional segment text in-place.
 - Silence mitigations:
-  - Ignore empty endpoints.  - Skip Whisper on near-silent audio.
+  - Ignore empty endpoints.
+  - Skip Whisper on near-silent audio.
+
 ### Implemented/Required in v2 (must exist to claim v2 compliance)
 
 - **Forced-finalize behavior** on `Enter`:
-  - Finalize must not depend on a natural sherpa endpoint.- **Window scheduling that never backlogs**:
-  - Bounded queue + drop ticks.- **Stale window result rejection**:
-  - Window results must be dropped if computed on an older audio snapshot / generation.- **Language-aware / timestamp-aware de-duplication**:
-  - Robust for languages without whitespace (e.g., Chinese).- **Live stability mechanism with rollback**:
+  - Finalize must not depend on a natural sherpa endpoint.
+- **Window scheduling that never backlogs**:
+  - Bounded queue + drop ticks.
+- **Stale window result rejection**:
+  - Window results must be dropped if computed on an older audio snapshot / generation.
+- **Language-aware / timestamp-aware de-duplication**:
+  - Robust for languages without whitespace (e.g., Chinese).
+- **Live stability mechanism with rollback**:
   - UI should see mostly append-only changes, but must allow limited corrections.
 - **UI-first Settings**:
   - All tunables adjustable from UI (env vars are dev-only, optional).
@@ -41,7 +80,7 @@ This document specifies the target architecture. Some parts already exist in cod
   - UI shows near-real-time partial text (low latency).
   - Text becomes increasingly accurate as more audio arrives (refinement).
 - When the user pauses or releases Space:
-  - The last spoken segment finalizes quickly and reads “clean” (punctuation, fewer homophone errors).
+  - The last spoken segment finalizes quickly and reads "clean" (punctuation, fewer homophone errors).
   - Final text remains stable for downstream steps (rewrite/inject).
 
 ### 1.2 Push-to-talk Lifecycle (UI-driven)
@@ -70,20 +109,20 @@ On `Enter`:
    - If it is near-silent, do not create a segment.
 4. Wait for required second-pass job(s) (at least the final segment) and then emit `stt/final`.
 
-This removes the “last words missing / last segment not cleaned up” failure mode.
+This removes the "last words missing / last segment not cleaned up" failure mode.
 
 ### 1.4 Text Update Semantics (What the UI Expects)
 
 UI expects a stream of `stt/partial` events that represent the **full current transcript**. It uses:
 
 - `revision` monotonicity to ignore stale updates.
-- A prefix-based delta computation to animate “append-only” growth:
+- A prefix-based delta computation to animate "append-only" growth:
   - If new text is a strict prefix extension of previous text, UI animates appended suffix.
   - If update is a rewrite (not prefix), UI delta is empty.
 
 Implication:
 
-- Backend should prefer updates that are mostly append-only in the “live tail”.
+- Backend should prefer updates that are mostly append-only in the "live tail".
 - Backend must tolerate rewrites when accuracy improves (e.g., endpoint replacement).
 
 Code anchor: `ui/src/App.tsx`, `src-tauri/src/events.rs`, `src-tauri/src/session.rs`.
@@ -108,9 +147,11 @@ Code anchor: `ui/src/App.tsx`, `src-tauri/src/events.rs`, `src-tauri/src/session
 - Microphone capture (macOS only): CoreAudio Voice Processing I/O (AudioUnit).
   - Captures the default microphone with system voice processing (for example, noise suppression and automatic gain control).
   - Produces mono `f32` samples.
+
 ### 2.4 STT Engines
 
-- Sherpa-onnx (streaming Zipformer-Transducer) via C API.- Whisper via `whisper-rs` (whisper.cpp).
+- Sherpa-onnx (streaming Zipformer-Transducer) via C API.
+- Whisper via `whisper-rs` (whisper.cpp).
 
 ### 2.5 Serialization and Contracts
 
@@ -162,7 +203,9 @@ Code anchor: `ui/src/App.tsx`, `src-tauri/src/events.rs`, `src-tauri/src/session
 
 ### 3.4 STT Wrappers and Configuration
 
-- Sherpa: `src-tauri/src/stt.rs`.- Whisper: `src-tauri/src/stt/whisper.rs`.
+- Sherpa: `src-tauri/src/stt.rs`.
+- Whisper: `src-tauri/src/stt/whisper.rs`.
+
 ### 3.5 Engine Manager + Settings (v2 required)
 
 **Spec requirement (v2):** Replace env-variable configuration with a persisted Settings model adjustable from UI.
@@ -172,9 +215,9 @@ New component: `EngineManager` (or equivalent):
 - Owns the currently loaded sherpa recognizer factory / model handles.
 - Owns the WhisperContext (exactly one at a time).
 - Applies new settings via:
-  - “soft apply” (no reload) → affects subsequent decode jobs.
-  - “engine reload” (recreate recognizer/context) → may take seconds but stays in-process.
-  - “restart-required” only for low-level dynamic library path switching (developer-only).
+  - "soft apply" (no reload) → affects subsequent decode jobs.
+  - "engine reload" (recreate recognizer/context) → may take seconds but stays in-process.
+  - "restart-required" only for low-level dynamic library path switching (developer-only).
 
 ---
 
@@ -190,6 +233,7 @@ New component: `EngineManager` (or equivalent):
 - `llm/rewrite`
 - `error`
 - Optional `engine/state` (recommended)
+
 ### 4.2 UI → Backend Commands
 
 Existing:
@@ -223,7 +267,8 @@ Two chunking concepts:
 2. Decode slices: fixed-size slices fed into sherpa.
 
 Spec requirement:
-- Sherpa must be fed fixed-size decode slices.- `chunk_ms` must be configurable.
+- Sherpa must be fed fixed-size decode slices.
+- `chunk_ms` must be configurable.
 
 Recommended default:
 - `sherpa_chunk_ms = 170`.
@@ -248,7 +293,8 @@ Skip Whisper decode when:
 - `mean_abs < min_mean_abs`
 
 Applies to:
-- Sliding-window jobs.- Second-pass jobs (including forced-finalize)
+- Sliding-window jobs.
+- Second-pass jobs (including forced-finalize)
 ---
 
 ## 6. STT Pipeline Behavior (Three Signals, One Transcript)
@@ -264,7 +310,8 @@ Second-pass replaces a segment in-place using `segment_id`.
 
 Sherpa provides:
 
-- Low-latency partials.- Endpoint detection (`is_endpoint()`)
+- Low-latency partials.
+- Endpoint detection (`is_endpoint()`)
 On endpoint:
 
 - If sherpa text is non-empty: commit provisional segment immediately.
@@ -273,17 +320,25 @@ On endpoint:
   - If audio is non-silent and long enough, still create a provisional segment (may be empty) and run second-pass.
 
 Then:
-- Clear `stt_live_text`.- Increment `window_generation`.- Reset live stability state.
+- Clear `stt_live_text`.
+- Increment `window_generation`.
+- Reset live stability state.
+
 ### 6.3 Whisper Second-pass Responsibilities
 
 On each endpoint + forced-finalize:
 
-- Decode endpoint audio.- Replace segment text.- Emit `stt/partial` (revision++)
+- Decode endpoint audio.
+- Replace segment text.
+- Emit `stt/partial` (revision++)
+
 ### 6.4 Whisper Sliding-window Responsibilities
 
 While speaking:
 
-- Every `step_ms`, decode last `window_ms` (plus optional `context_ms`)- Merge into live tail without duplicating committed text.- Emit `stt/partial` with `strategy=sliding_window`.
+- Every `step_ms`, decode last `window_ms` (plus optional `context_ms`)
+- Merge into live tail without duplicating committed text.
+- Emit `stt/partial` with `strategy=sliding_window`.
 Sliding-window must never mutate committed segments.
 
 ---
@@ -296,7 +351,11 @@ Exactly one Whisper model instance (WhisperContext) at a time.
 
 ### 7.2 Worker Roles
 
-- Mic reader (async)- Sherpa driver + scheduler (blocking)- Whisper worker (blocking)- Session update loop (async)
+- Mic reader (async)
+- Sherpa driver + scheduler (blocking)
+- Whisper worker (blocking)
+- Session update loop (async)
+
 ### 7.3 Priority Policy (Non-preemptive Reality Acknowledged)
 
 - High-priority: second-pass jobs
@@ -309,6 +368,7 @@ Rules:
    - Bounded queue capacity 1–2.   - `try_send`; drop when full
 3. non-preemptive note:
    - If a window decode has started, second-pass must wait for it to finish.   - Keep window decode cheap.
+
 ### 7.4 Separate Decode Profiles (strongly recommended)
 
 - Window profile: fast (e.g., greedy, best_of=1)
@@ -359,30 +419,42 @@ Boundary de-dup with short token overlap (8.4).
 
 Fallback if timestamps unavailable:
 - Language-aware token overlap across committed text and window text.
+
 ### 8.4 Language-aware Token Overlap (Boundary De-dup)
 
 Tokenization:
-- Whitespace languages: word tokens (lowercase, strip edge punctuation)- CJK/no-whitespace: grapheme or char tokens
+- Whitespace languages: word tokens (lowercase, strip edge punctuation)
+- CJK/no-whitespace: grapheme or char tokens
 
 Use K:
-- Words: 30.- Chars/graphemes: 80–120.
+- Words: 30.
+- Chars/graphemes: 80–120.
 Remove duplicated prefix in `window_tail_text`.
 
 ### 8.5 Live Stability with Rollback (v2 required)
 
 Maintain:
-- Stable prefix.- Unstable tail.
+- Stable prefix.
+- Unstable tail.
 Promotion:
 - Tokens become stable only after unchanged for N consecutive accepted ticks.
 Rollback:
 - If LCP shrinks beyond threshold, rollback stable prefix to LCP boundary and restart counting.
+
 ### 8.6 Endpoint Interaction
 
 On endpoint (natural or forced):
-- Commit segment.- Clear live tail.- Increment generation.- Reset stability state.- Update committed boundary time in 16k.
+- Commit segment.
+- Clear live tail.
+- Increment generation.
+- Reset stability state.
+- Update committed boundary time in 16k.
+
 ### 8.7 Empty/Whitespace Update Rules
 
-- Do not emit `stt/partial` if the only change is empty/whitespace-only live tail.- Do not create segments for silent endpoints.- Do not run whisper on near-silent audio.
+- Do not emit `stt/partial` if the only change is empty/whitespace-only live tail.
+- Do not create segments for silent endpoints.
+- Do not run whisper on near-silent audio.
 ---
 
 ## 9. Settings and Tuning Knobs (UI-first)
@@ -395,9 +467,16 @@ Release builds:
 
 Dev builds (optional):
 - Env vars may override for developer convenience.
+
 ### 9.2 Settings Model (summary)
 
-- Sherpa: model_dir, provider, threads, decoding method, endpoint rules, chunk_ms, int8 prefs.- Whisper: model_path, language, threads, force_gpu.- Whisper profiles:  - Window profile (fast)  - Second-pass profile (accurate)- Sliding-window: enabled, window_ms, step_ms, context_ms, min_mean_abs, emit_every.- Merge/stability: N, rollback_threshold, overlap_K (word/char)
+- Sherpa: model_dir, provider, threads, decoding method, endpoint rules, chunk_ms, int8 prefs.
+- Whisper: model_path, language, threads, force_gpu.
+- Whisper profiles:
+- Window profile (fast)  - Second-pass profile (accurate)
+- Sliding-window: enabled, window_ms, step_ms, context_ms, min_mean_abs, emit_every.
+- Merge/stability: N, rollback_threshold, overlap_K (word/char)
+
 ### 9.3 Apply Levels (no restart for normal users)
 
 - `soft_applied`: no reload needed
@@ -409,14 +488,19 @@ Normal UI must not require restart.
 ### 9.4 Validation
 
 - `best_of`: 1..=8
-- Window_ms >= step_ms.- Chunk_ms within safe bounds.- Reject invalid settings atomically (no partial apply)
+- Window_ms >= step_ms.
+- Chunk_ms within safe bounds.
+- Reject invalid settings atomically (no partial apply)
 ---
 
 ## 10. Observability and Debugging
 
 Env-gated or settings-gated logs (no absolute paths):
 
-- Session start: mic SR, sherpa config, window config, decode profiles.- Endpoint: segment id, duration, second-pass latency.- Window tick: dropped tick, stale drop, decode time vs budget.- Engine apply: apply level, reload duration.
+- Session start: mic SR, sherpa config, window config, decode profiles.
+- Endpoint: segment id, duration, second-pass latency.
+- Window tick: dropped tick, stale drop, decode time vs budget.
+- Engine apply: apply level, reload duration.
 ---
 
 ## 11. Reference Code Locations
@@ -425,21 +509,23 @@ Env-gated or settings-gated logs (no absolute paths):
 - Session orchestration: `src-tauri/src/session.rs`
 - Events: `src-tauri/src/events.rs`
 - Mic capture: `src-tauri/src/audio/mic_stream.rs`
-- Sherpa: `src-tauri/src/stt.rs`.- Whisper: `src-tauri/src/stt/whisper.rs`.- Harness: `research/stt_compare/...`
+- Sherpa: `src-tauri/src/stt.rs`.
+- Whisper: `src-tauri/src/stt/whisper.rs`.
+- Harness: `research/stt_compare/...`
 - Settings (v2): `src-tauri/src/settings.rs`
 - Engine manager (v2): `src-tauri/src/engine.rs`
-- Implementation notes: `docs/spec/stt_dictation_pipeline_impl_notes.md`
+- Implementation notes: `docs/guide/development/stt_dictation_pipeline_impl_notes.md`
 
 ---
 
 ## 12. Status and Maintenance
 
-- This is the canonical spec for “parallel sherpa + whisper-window + whisper second pass” (v2).
+- This is the canonical spec for "parallel sherpa + whisper-window + whisper second pass" (v2).
 - If implementation diverges, update this document and related specs.
 
 ---
 
-# Appendix A: Minimal “Must Pass” Behavioral Tests (v2)
+# Appendix A: Minimal "Must Pass" Behavioral Tests (v2)
 
 1. Forced finalize correctness:
    - Speak then immediately release Space; `stt/final` must include last words.
@@ -479,7 +565,11 @@ Define 3 apply levels:
 
 **SoftApplied (no reload)**
 - Whisper decode params (window/second-pass):
-  - Best_of, beam_size, beam_patience, language.- Sliding-window knobs:  - Enabled, window_ms, step_ms, context_ms, min_mean_abs, emit_every.- Merge/stability knobs:  - Overlap_K, N, rollback_threshold.
+  - Best_of, beam_size, beam_patience, language.
+- Sliding-window knobs:
+- Enabled, window_ms, step_ms, context_ms, min_mean_abs, emit_every.
+- Merge/stability knobs:
+- Overlap_K, N, rollback_threshold.
 **Reloaded (in-process re-init)**
 - Whisper model_path
 - Whisper force_gpu (if implementation requires recreating context)
@@ -509,7 +599,7 @@ Transitions:
 
 UI behavior:
 
-- When `Reloading`, disable PTT and show “Loading speech engine…”.
+- When `Reloading`, disable PTT and show "Loading speech engine…".
 - On `Error`, show error and allow retry.
 
 ## B.4 Engine Generation (Safety against stale results)
@@ -517,7 +607,9 @@ UI behavior:
 Maintain a global `engine_generation: AtomicU64`.
 
 - Increment generation whenever:
-  - Engine is reloaded.  - A session is force-canceled due to engine changes.- Each whisper job carries:
+  - Engine is reloaded.
+- A session is force-canceled due to engine changes.
+- Each whisper job carries:
   - `engine_generation` snapshot
   - `window_generation` snapshot (session-level)
   - `job_id`
@@ -693,7 +785,7 @@ impl EngineManager {
 
 ### B.6.1 Notes on user experience
 
-- For `Reloaded`, UI should show a small spinner “Loading speech engine…” and disable dictation for that duration.
+- For `Reloaded`, UI should show a small spinner "Loading speech engine…" and disable dictation for that duration.
 - Most users should never see `RestartRequired`. Keep dylib path changes in a hidden developer panel.
 
 ---
@@ -701,7 +793,11 @@ impl EngineManager {
 # Appendix C: Merge Implementation Details (Window + Segments) + Pseudocode (v2)
 
 This appendix provides concrete implementation guidance for:
-- Timestamp-aware tail extraction.- Language-aware de-dup.- Stable tail + rollback.- Stale-result rejection.
+- Timestamp-aware tail extraction.
+- Language-aware de-dup.
+- Stable tail + rollback.
+- Stale-result rejection.
+
 ## C.1 Data model (recommended)
 
 ```rust
@@ -751,8 +847,10 @@ When new audio arrives (native):
 
 When a segment is committed (endpoint or forced-finalize), update committed boundary:
 
-- Simplest approximation: also resample the segment audio to 16k and add its length:  - `committed_end_16k_samples += seg_16k_len`
-- Or if you already track `total_16k_samples` at segment boundary, set:  - `committed_end_16k_samples = boundary_total_16k_samples`
+- Simplest approximation: also resample the segment audio to 16k and add its length:
+- `committed_end_16k_samples += seg_16k_len`
+- Or if you already track `total_16k_samples` at segment boundary, set:
+- `committed_end_16k_samples = boundary_total_16k_samples`
 
 ## C.3 Window job scheduling + stale rejection
 
@@ -760,13 +858,15 @@ Producer (streaming driver):
 - Every `step_ms`, prepare a `WindowJobSnapshot`:
   - `job_id += 1`
   - `window_end_16k_samples = total_16k_samples`
-  - Include `engine_generation` and `window_generation`.- `try_send` to low-priority queue; drop if full.
+  - Include `engine_generation` and `window_generation`.
+- `try_send` to low-priority queue; drop if full.
 - Keep at most 1–2 queued ticks.
 
 Consumer (whisper worker):
 - Decode and return `(snapshot, decoded_segments_with_timestamps, raw_text)`.
 Session updater (apply):
-- Accept only if:  - `snapshot.engine_generation == engine_generation_now`
+- Accept only if:
+- `snapshot.engine_generation == engine_generation_now`
   - `snapshot.window_generation == session.window_generation_now`
   - `snapshot.job_id > merge_state.last_applied_job_id` (or == latest expected)
   - `snapshot.window_end_16k_samples` is not older than current `total_16k_samples` by more than a small tolerance
@@ -810,7 +910,7 @@ fn extract_window_tail_text(
 
 **Language note:** For CJK, you may prefer joining without spaces. A safe rule:
 - If the whisper text already contains spaces (English), keep them.
-- If it doesn’t (Chinese), don’t inject spaces.
+- If it doesn't (Chinese), don't inject spaces.
 (See tokenization and join rules below.)
 
 ## C.5 Language-aware tokenization
@@ -823,7 +923,9 @@ Recommended crate for grapheme segmentation:
 Tokenization rules:
 
 - If language is English or the text contains whitespace:
-  - Split on whitespace into word tokens.  - Normalize: lowercase + strip edge punctuation.- Else (CJK/no whitespace):
+  - Split on whitespace into word tokens.
+- Normalize: lowercase + strip edge punctuation.
+- Else (CJK/no whitespace):
   - Split into grapheme clusters (or chars)  - Normalize: keep as-is or lowercase if alphabetic; optionally strip common punctuation tokens.
 Pseudocode:
 
@@ -877,14 +979,16 @@ fn dedup_boundary(
   let (w_toks, w_join) = tokenize(window_tail_text, lang);
 
   let k = if matches!(w_join, JoinRule::Space) { k_words } else { k_chars };
-  let c_suffix = if c_toks.len() > k { &c_toks[c_toks.len()-k..] } else { &c_toks[..] };
+  let c_suffix = if c_toks.len() > k { &c_toks[c_toks.len()
+- k..] } else { &c_toks[..] };
 
   // Find longest suffix of c_suffix that matches a prefix of w_toks.
   let mut best = 0usize;
   let max = c_suffix.len().min(w_toks.len());
 
   for len in 1..=max {
-    let c_part = &c_suffix[c_suffix.len()-len..];
+    let c_part = &c_suffix[c_suffix.len()
+- len..];
     let w_part = &w_toks[..len];
 
     if c_part.iter().map(|t| &t.norm).eq(w_part.iter().map(|t| &t.norm)) {
@@ -900,6 +1004,7 @@ fn dedup_boundary(
 Fallback behavior:
 - If overlap matching is too weak or text is suspicious (e.g., best==0 and window_tail is very long), you may choose:
   - Replace-only tail for that tick (do not attempt append)  - Or fallback to sherpa tail for that tick.
+
 ## C.7 Live stability with rollback (rolling N candidates)
 
 **Recommended approach (simple + robust):**
@@ -1048,11 +1153,11 @@ When applying a new live text:
   - Emit `stt/partial { revision, text: build_stt_text(), strategy: sliding_window }`.
 ---
 
-# Appendix D: UI Guidance for “No App Restart” Experience
+# Appendix D: UI Guidance for "No App Restart" Experience
 
 - Normal settings UI should only include knobs that are `SoftApplied` or `Reloaded`.
 - Any `RestartRequired` knob must be hidden behind a developer toggle and clearly labeled.
 - When applying `Reloaded`, UI shows:
-  - “Loading speech engine…” + spinner
+  - "Loading speech engine…" + spinner
   - Disables PTT until `engine/state=ready`.
 This ensures user-perceived experience is smooth and never requires quitting/reopening the app.

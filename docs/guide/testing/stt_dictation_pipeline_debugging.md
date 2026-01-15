@@ -64,7 +64,7 @@ The trace file is JSON Lines (one JSON object per line). Each line includes:
 This is intended to make “who changed the text, when, and why” explicit.
 
 Note: `segment_commit` lines should not have an empty `text` value. If you observe empty segment commits, treat it as a bug and include the trace as a regression case.
-See `docs/spec/stt_dictation_trace_regressions.md` for known regression cases.
+See `docs/guide/testing/stt_dictation_trace_regressions.md` for known regression cases.
 
 ## 3. Build a small, targeted reproduction set
 
@@ -103,7 +103,7 @@ When reporting, include:
 - The last 3–5 `stt_partial` lines before/after the rewrite.
 - Which behavior category it matches (flicker, finalization regression, silence hallucination, speech rate sensitivity).
 - A trace summary to highlight strategy switches and rewrites:
-  - `python3 script/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --timeline`
-  - `python3 script/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --events`
+  - `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --timeline`
+  - `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --events`
 
 If you start a new session before the previous finalization completes, the previous session may emit a `finalize_detached` trace line. In that case, the WAV file is still written (when tracing is enabled), but the previous session may not produce a complete `stt_final` line.

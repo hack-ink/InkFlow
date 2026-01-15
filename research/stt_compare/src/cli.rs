@@ -87,7 +87,7 @@ pub struct Cli {
 	#[arg(
 		long,
 		value_name = "PATH",
-		default_value = "model/sherpa-onnx-streaming-zipformer-en-2023-06-21"
+		default_value = "models/sherpa-onnx-streaming-zipformer-en-2023-06-21"
 	)]
 	pub sherpa_model_path: PathBuf,
 	/// Sherpa provider.
@@ -109,7 +109,7 @@ pub struct Cli {
 	#[arg(long)]
 	pub sherpa_int8_decoder: bool,
 	/// Whisper model file.
-	#[arg(long, value_name = "PATH", default_value = "model/whisper/ggml-large-v3-turbo-q8_0.bin")]
+	#[arg(long, value_name = "PATH", default_value = "models/whisper/ggml-large-v3-turbo-q8_0.bin")]
 	pub whisper_model_path: PathBuf,
 	/// Whisper thread count override.
 	#[arg(long, value_name = "N")]

@@ -27,7 +27,7 @@ target
 .DS_Store
 
 # General Ignores
-model
+models
 third_party/sherpa-onnx-prefix
 third_party/sherpa-onnx-build-*
 tmp

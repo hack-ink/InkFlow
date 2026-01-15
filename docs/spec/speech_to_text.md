@@ -9,7 +9,7 @@ This document describes the speech-to-text integration used by AiR (sherpa-onnx 
 - Performance-first defaults (int8 where practical).
 - Minimal native build (C API only; disable unused components).
 - Two-pass finalization: sherpa streaming partials + whisper final text after each endpoint.
-- Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `docs/spec/stt_dictation_pipeline_spec.md`).
+- Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `docs/spec/stt_dictation_pipeline.md`).
 
 ## Quick Start (macOS)
 
@@ -23,8 +23,8 @@ cargo make dev
 No environment variables are required for the default repository layout. The app will automatically locate:
 
 - Native libraries in `third_party/sherpa-onnx-prefix/lib/`.
-- The default model in `model/sherpa-onnx-streaming-zipformer-en-2023-06-21/`.
-- The default whisper model in `model/whisper/ggml-large-v3-turbo-q8_0.bin` (or `AIR_WHISPER_MODEL_PATH`).
+- The default model in `models/sherpa-onnx-streaming-zipformer-en-2023-06-21/`.
+- The default whisper model in `models/whisper/ggml-large-v3-turbo-q8_0.bin` (or `AIR_WHISPER_MODEL_PATH`).
 
 The `third_party/sherpa-onnx-prefix/` directory is a generated build artifact and is ignored by git.
 
@@ -47,7 +47,7 @@ These environment variables are optional overrides. AiR will use executable-rela
 
 - `AIR_SHERPA_ONNX_MODEL_DIR`
   - Path to the model directory containing `tokens.txt` and encoder/decoder/joiner ONNX files.
-  - Default: auto-discovered (typically `model/sherpa-onnx-streaming-zipformer-en-2023-06-21`).
+  - Default: auto-discovered (typically `models/sherpa-onnx-streaming-zipformer-en-2023-06-21`).
 - `AIR_SHERPA_ONNX_PROVIDER`
   - ONNX Runtime provider string. Typical values: `cpu`, `coreml`.
   - Default: `cpu`
@@ -89,19 +89,19 @@ To avoid repeated “empty endpoints” during silence, segments with an empty s
 
 ### Default Whisper Model
 
-- Default model path: `model/whisper/ggml-large-v3-turbo-q8_0.bin`
+- Default model path: `models/whisper/ggml-large-v3-turbo-q8_0.bin`
 - Override: `AIR_WHISPER_MODEL_PATH=/absolute/path/to/model.bin`
 
 The default path is auto-discovered relative to the running executable:
 
-- macOS app bundle: `Contents/Resources/model/whisper/ggml-large-v3-turbo-q8_0.bin`
-- Repo layout: `model/whisper/ggml-large-v3-turbo-q8_0.bin`
+- macOS app bundle: `Contents/Resources/models/whisper/ggml-large-v3-turbo-q8_0.bin`
+- Repo layout: `models/whisper/ggml-large-v3-turbo-q8_0.bin`
 
 ### Whisper Runtime Configuration (Environment Variables)
 
 - `AIR_WHISPER_MODEL_PATH`
   - Path to the whisper GGML model file.
-  - Default: auto-discovered (typically `model/whisper/ggml-large-v3-turbo-q8_0.bin`).
+  - Default: auto-discovered (typically `models/whisper/ggml-large-v3-turbo-q8_0.bin`).
 - `AIR_WHISPER_LANGUAGE`
   - Whisper language code (for example, `en`). Use `auto` to enable language detection.
   - Default: `en`
@@ -142,7 +142,7 @@ This will:
 - Ensure `third_party/sherpa-onnx` is available (git submodule when present; otherwise a direct clone).
 - Build and install a minimal C API-only configuration into `third_party/sherpa-onnx-prefix`.
 - Rewrite `third_party/sherpa-onnx-prefix/sherpa-onnx.pc` to use a relocatable `prefix=${pcfiledir}`.
-- Download and extract the default streaming model into `model/` if missing.
+- Download and extract the default streaming model into `models/` if missing.
 
 ### Manual Build (Reference)
 
@@ -203,5 +203,5 @@ cmake --install build-macos-min
 
 ## Related Documents
 
-- For a quick A/B comparison between "two-pass" and "whisper-only" baselines, see `docs/spec/stt_comparison_harness.md`.
-- For the canonical dictation pipeline spec (including UI stability and overlap removal), see `docs/spec/stt_dictation_pipeline_spec.md`.
+- For a quick A/B comparison between "two-pass" and "whisper-only" baselines, see `docs/guide/testing/stt_comparison_harness.md`.
+- For the canonical dictation pipeline spec (including UI stability and overlap removal), see `docs/spec/stt_dictation_pipeline.md`.
