@@ -166,7 +166,7 @@ if [[ -f "$WHISPER_MODEL_PATH" ]]; then
   echo "Whisper model already exists: $WHISPER_MODEL_PATH."
 else
   echo "Whisper model is missing: $WHISPER_MODEL_PATH." >&2
-  echo "Provide a GGML model at that path, or set AIR_WHISPER_MODEL_PATH at runtime." >&2
+  echo "Provide a GGML model at that path, or set INKFLOW_WHISPER_MODEL_PATH at runtime." >&2
 fi
 
 echo "Setup complete."

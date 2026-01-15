@@ -1,6 +1,6 @@
 # Architecture
 
-Purpose: Define system architecture, key decisions, and repository boundaries for AiR.
+Purpose: Define system architecture, key decisions, and repository boundaries for InkFlow.
 
 Audience: Engineers and LLMs reading the canonical system specification.
 

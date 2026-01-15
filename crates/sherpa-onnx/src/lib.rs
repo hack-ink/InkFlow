@@ -5,7 +5,7 @@
 //!
 //! The shared library lookup follows these rules:
 //!
-//! - If `AIR_SHERPA_ONNX_DYLIB` is set, it is treated as an explicit path to the shared library.
+//! - If `INKFLOW_SHERPA_ONNX_DYLIB` is set, it is treated as an explicit path to the shared library.
 //! - Otherwise, the loader searches for the platform-specific library name in common locations
 //!   relative to the current executable.
 
@@ -355,7 +355,7 @@ impl SherpaOnnxApi {
 		};
 		let mut candidates = Vec::new();
 
-		if let Ok(override_path) = std::env::var("AIR_SHERPA_ONNX_DYLIB") {
+		if let Ok(override_path) = std::env::var("INKFLOW_SHERPA_ONNX_DYLIB") {
 			let override_path = override_path.trim();
 
 			if !override_path.is_empty() {
@@ -428,7 +428,7 @@ impl SherpaOnnxApi {
 			}
 
 			message.push_str(
-				"Hint: Run `cargo make setup-macos` to build the native libraries, or set AIR_SHERPA_ONNX_DYLIB to an absolute path.",
+				"Hint: Run `cargo make setup-macos` to build the native libraries, or set INKFLOW_SHERPA_ONNX_DYLIB to an absolute path.",
 			);
 
 			return Err(SherpaError { message });

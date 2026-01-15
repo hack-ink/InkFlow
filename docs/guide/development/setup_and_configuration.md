@@ -13,9 +13,9 @@ Notes:
 ```json
 {
   "$schema": "./gen/schemas/config.schema.json",
-  "productName": "AiR",
+  "productName": "InkFlow",
   "version": "0.1.0",
-  "identifier": "com.hackink.air",
+  "identifier": "ink.hack.inkflow",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:1420",
@@ -37,7 +37,7 @@ Notes:
         "resizable": false,
         "width": 720,
         "height": 64,
-        "title": "AiR",
+        "title": "InkFlow",
         "shadow": true,
         "windowEffects": {
           "effects": ["hudWindow"],
@@ -88,7 +88,7 @@ commands.allow = ["session_dispatch"]
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>AiR needs microphone access to transcribe your speech into text.</string>
+<string>InkFlow needs microphone access to transcribe your speech into text.</string>
 ```
 
 ## `src-tauri/Cargo.toml` (Feature Gates)

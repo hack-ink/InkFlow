@@ -23,7 +23,7 @@ dependencies = ["setup-macos"]
 command = "bash"
 args = [
 	"-lc",
-	"export AIR_STT_TRACE_DIR=\"$PWD/tmp/stt_trace\"; cargo tauri dev",
+	"export INKFLOW_STT_TRACE_DIR=\"$PWD/tmp/stt_trace\"; cargo tauri dev",
 ]
 
 [tasks.fmt]

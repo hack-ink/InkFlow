@@ -48,7 +48,7 @@ pub fn run() {
 			}
 		})
 		.setup(|app| {
-			let whisper_logs_enabled = std::env::var("AIR_WHISPER_LOGS")
+			let whisper_logs_enabled = std::env::var("INKFLOW_WHISPER_LOGS")
 				.ok()
 				.and_then(|value| match value.trim().to_lowercase().as_str() {
 					"1" | "true" | "yes" | "y" | "on" => Some(true),

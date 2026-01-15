@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AiR needs microphone access to transcribe your voice into text.</string>
+	<string>InkFlow needs microphone access to transcribe your voice into text.</string>
 </dict>
 </plist>
 

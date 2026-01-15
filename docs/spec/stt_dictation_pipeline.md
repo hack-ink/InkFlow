@@ -1,12 +1,12 @@
 # STT Dictation Pipeline Spec (Canonical v2)
 
-Purpose: Define the canonical dictation pipeline for AiR.
+Purpose: Define the canonical dictation pipeline for InkFlow.
 
 Audience: Engineers and LLMs reading the system specification.
 
 Scope: End-to-end dictation behavior, including streaming partials, live refinement, and finalization.
 
-This document is a single, comprehensive specification of AiR's dictation STT pipeline:
+This document is a single, comprehensive specification of InkFlow's dictation STT pipeline:
 
 - **sherpa-onnx streaming** for low-latency partials and endpoint detection.
 - **Whisper sliding-window decoding** in parallel during PTT to refine the live transcript while speaking.

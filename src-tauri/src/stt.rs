@@ -90,7 +90,7 @@ fn resolve_sherpa_model_dir(settings: &SherpaSettings) -> PathBuf {
 	const DEFAULT_MODEL_DIR_NAME: &str = "sherpa-onnx-streaming-zipformer-en-2023-06-21";
 
 	if cfg!(debug_assertions)
-		&& let Ok(path) = std::env::var("AIR_SHERPA_ONNX_MODEL_DIR")
+		&& let Ok(path) = std::env::var("INKFLOW_SHERPA_ONNX_MODEL_DIR")
 	{
 		let path = path.trim();
 		if !path.is_empty() {

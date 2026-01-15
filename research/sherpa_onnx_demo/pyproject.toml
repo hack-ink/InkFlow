@@ -1,5 +1,5 @@
 [tool.poetry]
-authors      = ["AiR_ <devnull@example.com>"]
+authors      = ["InkFlow <devnull@example.com>"]
 description  = "One-command sherpa-onnx streaming ASR demo (model auto-download)."
 name         = "sherpa-onnx-demo"
 package-mode = true

@@ -31,7 +31,7 @@ class PartialEvent:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Summarize AiR STT trace NDJSON files and optionally print a timeline of stt_partial events."
+            "Summarize InkFlow STT trace NDJSON files and optionally print a timeline of stt_partial events."
         )
     )
     parser.add_argument(

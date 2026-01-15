@@ -153,14 +153,14 @@ pub fn write_recorded_audio_wav(path: &Path, audio: &RecordedAudio) -> Result<()
 }
 
 fn resolve_trace_dir() -> Result<Option<PathBuf>, AppError> {
-	if let Ok(dir) = std::env::var("AIR_STT_TRACE_DIR") {
+	if let Ok(dir) = std::env::var("INKFLOW_STT_TRACE_DIR") {
 		let dir = dir.trim();
 		if !dir.is_empty() {
 			return Ok(Some(PathBuf::from(dir)));
 		}
 	}
 
-	if let Ok(flag) = std::env::var("AIR_STT_TRACE")
+	if let Ok(flag) = std::env::var("INKFLOW_STT_TRACE")
 		&& parse_bool(&flag).unwrap_or(false)
 	{
 		return Ok(Some(PathBuf::from(DEFAULT_TRACE_DIR)));

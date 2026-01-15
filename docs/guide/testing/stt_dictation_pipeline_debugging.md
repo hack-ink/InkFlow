@@ -15,12 +15,12 @@ The goal is to turn subjective reports into shareable, replayable evidence.
 
 The backend can write an NDJSON trace and the recorded session audio when tracing is enabled.
 
-By default, whisper.cpp / GGML logs are silenced to keep traces readable. To re-enable them for investigation, set `AIR_WHISPER_LOGS=1`.
+By default, whisper.cpp / GGML logs are silenced to keep traces readable. To re-enable them for investigation, set `INKFLOW_WHISPER_LOGS=1`.
 
 Enable tracing with one of the following:
 
-- `AIR_STT_TRACE=1` (writes into `tmp/stt_trace/`)
-- `AIR_STT_TRACE_DIR=/absolute/or/relative/path` (custom directory)
+- `INKFLOW_STT_TRACE=1` (writes into `tmp/stt_trace/`)
+- `INKFLOW_STT_TRACE_DIR=/absolute/or/relative/path` (custom directory)
 
 Run the app from a terminal so logs and trace files are available:
 

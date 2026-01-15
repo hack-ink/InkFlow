@@ -241,7 +241,7 @@ fn resolve_whisper_model_path(settings: &WhisperSettings) -> PathBuf {
 	const DEFAULT_MODEL_NAME: &str = "ggml-large-v3-turbo-q8_0.bin";
 
 	if cfg!(debug_assertions)
-		&& let Ok(path) = std::env::var("AIR_WHISPER_MODEL_PATH")
+		&& let Ok(path) = std::env::var("INKFLOW_WHISPER_MODEL_PATH")
 	{
 		let path = path.trim();
 		if !path.is_empty() {
@@ -283,14 +283,14 @@ fn resolve_whisper_model_path(settings: &WhisperSettings) -> PathBuf {
 
 fn resolve_whisper_language(settings: &WhisperSettings) -> Result<String, AppError> {
 	if cfg!(debug_assertions)
-		&& let Ok(language) = std::env::var("AIR_WHISPER_LANGUAGE")
+		&& let Ok(language) = std::env::var("INKFLOW_WHISPER_LANGUAGE")
 	{
 		let language = language.trim().to_string();
 		if !language.is_empty() {
 			if language.contains('\0') {
 				return Err(AppError::new(
 					"whisper_config_invalid",
-					"AIR_WHISPER_LANGUAGE must not contain NUL bytes.",
+					"INKFLOW_WHISPER_LANGUAGE must not contain NUL bytes.",
 				));
 			}
 			return Ok(language);
@@ -310,7 +310,7 @@ fn resolve_whisper_language(settings: &WhisperSettings) -> Result<String, AppErr
 
 fn resolve_whisper_threads(settings: &WhisperSettings) -> Option<i32> {
 	if cfg!(debug_assertions)
-		&& let Ok(value) = std::env::var("AIR_WHISPER_NUM_THREADS")
+		&& let Ok(value) = std::env::var("INKFLOW_WHISPER_NUM_THREADS")
 		&& let Ok(parsed) = value.trim().parse::<i32>()
 		&& parsed > 0
 	{
@@ -322,7 +322,7 @@ fn resolve_whisper_threads(settings: &WhisperSettings) -> Option<i32> {
 
 fn resolve_whisper_force_gpu(settings: &WhisperSettings) -> Option<bool> {
 	if cfg!(debug_assertions)
-		&& let Ok(value) = std::env::var("AIR_WHISPER_FORCE_GPU")
+		&& let Ok(value) = std::env::var("INKFLOW_WHISPER_FORCE_GPU")
 		&& let Some(parsed) = parse_bool(&value)
 	{
 		return Some(parsed);

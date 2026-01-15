@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AiR",
+  "productName": "InkFlow",
   "version": "0.1.0",
-  "identifier": "com.hackink.air",
+  "identifier": "ink.hack.inkflow",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "AiR",
+        "title": "InkFlow",
         "label": "main",
         "width": 720,
         "height": 64,
