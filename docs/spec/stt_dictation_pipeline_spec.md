@@ -428,7 +428,7 @@ Env-gated or settings-gated logs (no absolute paths):
 - Sherpa: `src-tauri/src/stt.rs`.- Whisper: `src-tauri/src/stt/whisper.rs`.- Harness: `research/stt_compare/...`
 - Settings (v2): `src-tauri/src/settings.rs`
 - Engine manager (v2): `src-tauri/src/engine.rs`
-- Implementation notes: `spec/53_stt_dictation_pipeline_impl_notes.md`
+- Implementation notes: `docs/spec/stt_dictation_pipeline_impl_notes.md`
 
 ---
 

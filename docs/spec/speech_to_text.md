@@ -9,7 +9,7 @@ This document describes the speech-to-text integration used by AiR (sherpa-onnx 
 - Performance-first defaults (int8 where practical).
 - Minimal native build (C API only; disable unused components).
 - Two-pass finalization: sherpa streaming partials + whisper final text after each endpoint.
-- Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `spec/52_stt_dictation_pipeline_spec.md`).
+- Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `docs/spec/stt_dictation_pipeline_spec.md`).
 
 ## Quick Start (macOS)
 
@@ -203,5 +203,5 @@ cmake --install build-macos-min
 
 ## Related Documents
 
-- For a quick A/B comparison between "two-pass" and "whisper-only" baselines, see `spec/56_stt_comparison_harness.md`.
-- For the canonical dictation pipeline spec (including UI stability and overlap removal), see `spec/52_stt_dictation_pipeline_spec.md`.
+- For a quick A/B comparison between "two-pass" and "whisper-only" baselines, see `docs/spec/stt_comparison_harness.md`.
+- For the canonical dictation pipeline spec (including UI stability and overlap removal), see `docs/spec/stt_dictation_pipeline_spec.md`.

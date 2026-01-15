@@ -36,7 +36,7 @@ This document records the choices that shape the implementation plan.
 - **Streaming partials and endpoints:** sherpa-onnx streaming ASR (Zipformer-Transducer) via the sherpa-onnx C API.
   - Goal: low-latency, local, streaming partials with endpoint-based segment boundaries.
 - **Live refinement (planned):** run Whisper in a rolling window in parallel to continuously improve the on-screen live transcript while speaking.
-  - Canonical spec: `spec/52_stt_dictation_pipeline_spec.md`.
+  - Canonical spec: `docs/spec/stt_dictation_pipeline_spec.md`.
 - **Finalization:** on each endpoint, run Whisper on that segment’s audio and replace the provisional sherpa segment text.
 - **Integration:** A thin Rust wrapper around the C API.
   - `crates/sherpa-onnx-sys`: bindgen-generated unsafe FFI for a minimal online C API surface.

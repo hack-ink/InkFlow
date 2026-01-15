@@ -4,9 +4,9 @@ This document is a high-level guide for implementing changes without needing to 
 
 ## What to Read First
 
-- Start with `spec/00_index.md` for the full map of documents.
-- Read `spec/10_architecture_decisions.md` to understand constraints and non-goals.
-- Read `spec/30_backend_ui_contract.md` before changing events or commands.
+- Start with `docs/spec/index.md` for the full map of documents.
+- Read `docs/spec/architecture_decisions.md` to understand constraints and non-goals.
+- Read `docs/spec/backend_ui_contract.md` before changing events or commands.
 
 ## End-to-End Flow (Mental Model)
 
@@ -41,17 +41,17 @@ Frontend entry point:
 ## How to Add or Update Spec and Context
 
 - Update an existing spec document if the change modifies architecture, contracts, configuration, or workflows.
-- Add a new context entry by appending a short summary to the correct rolling 7-day digest under `spec/context/`.
-- Follow the formatting rules in `spec/RULES.md`.
+- Add a new context entry by appending a short summary to the correct rolling 7-day digest under `docs/spec/context/`.
+- Follow the formatting rules in `docs/spec/RULES.md`.
 
 ## Common Change Types
 
-- Architecture and boundaries: update `spec/10_architecture_decisions.md` and `spec/20_repository_layout.md`.
-- Events and commands: update `spec/30_backend_ui_contract.md`.
-- Setup, permissions, and configuration: update `spec/40_setup_and_configuration.md`.
-- Speech-to-text behavior: update `spec/50_speech_to_text.md` and, when relevant, `spec/52_stt_dictation_pipeline_spec.md`.
-- STT measurement and tuning: update `spec/56_stt_comparison_harness.md`.
+- Architecture and boundaries: update `docs/spec/architecture_decisions.md` and `docs/spec/repository_layout.md`.
+- Events and commands: update `docs/spec/backend_ui_contract.md`.
+- Setup, permissions, and configuration: update `docs/spec/setup_and_configuration.md`.
+- Speech-to-text behavior: update `docs/spec/speech_to_text.md` and, when relevant, `docs/spec/stt_dictation_pipeline_spec.md`.
+- STT measurement and tuning: update `docs/spec/stt_comparison_harness.md`.
 
 ## Deep Dive Reference
 
-If you need a detailed, file-by-file planning document, see `spec/archive/file_by_file_implementation_checklist.md`.
+If you need a detailed, file-by-file planning document, see `docs/spec/archive/file_by_file_implementation_checklist.md`.

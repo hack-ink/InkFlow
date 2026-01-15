@@ -41,4 +41,4 @@ Each task should be recorded in the rolling context digest once completed.
 
 - Update architecture decisions and repository layout specs.
 - Update implementation notes and work plan guidance.
-- Record each completed task in `spec/context/`.
+- Record each completed task in `docs/spec/context/`.

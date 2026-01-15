@@ -25,7 +25,7 @@ Files typically kept:
 ├── crates/
 │   ├── sherpa-onnx-sys/           # bindgen-generated FFI for sherpa-onnx C API.
 │   └── sherpa-onnx/               # Safe wrapper (dynamic loading + JSON parsing).
-├── spec/                          # Architecture, implementation notes, and context.
+├── docs/spec/                          # Architecture, implementation notes, and context.
 │   └── context/                   # Rolling 7-day context digests.
 ├── model/                         # ASR models (downloaded by setup).
 ├── script/

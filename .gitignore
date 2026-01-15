@@ -1,10 +1,11 @@
 # AI
 .codex
-.orchestrator
 .specify
+.worktrees
 
 # Editor
 .vscode
+.zed
 
 # Language Specifics
 
@@ -15,6 +16,7 @@ node_modules
 
 ## Python
 __pycache__
+.pytest_cache
 .ruff_cache
 .venv
 
@@ -26,8 +28,8 @@ target
 
 # General Ignores
 model
-third_party/sherpa-onnx-prefix/
-third_party/sherpa-onnx-build-*/
+third_party/sherpa-onnx-prefix
+third_party/sherpa-onnx-build-*
 tmp
 *.bak
 *.log

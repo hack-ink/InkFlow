@@ -580,7 +580,7 @@ Acceptance:
 ### Phase 5: Tune and Document
 
 - Validate on the same samples used by `research/stt_compare` and on microphone input.
-- Update `spec/50_speech_to_text.md` with the new window configuration knobs.
+- Update `docs/spec/speech_to_text.md` with the new window configuration knobs.
 
 Acceptance:
 

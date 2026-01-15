@@ -64,7 +64,7 @@ The trace file is JSON Lines (one JSON object per line). Each line includes:
 This is intended to make “who changed the text, when, and why” explicit.
 
 Note: `segment_commit` lines should not have an empty `text` value. If you observe empty segment commits, treat it as a bug and include the trace as a regression case.
-See `spec/55_stt_dictation_trace_regressions.md` for known regression cases.
+See `docs/spec/stt_dictation_trace_regressions.md` for known regression cases.
 
 ## 3. Build a small, targeted reproduction set
 
