@@ -4,7 +4,6 @@
 .worktrees
 
 # Editor
-xcuserdata
 .vscode
 .zed
 
@@ -23,6 +22,10 @@ __pycache__
 
 ## Rust
 target
+
+## Swift
+xcuserdata
+.build
 
 # System
 .DS_Store

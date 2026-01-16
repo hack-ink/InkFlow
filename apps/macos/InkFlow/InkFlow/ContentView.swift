@@ -1,24 +1,15 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
 	@StateObject private var model = InkFlowViewModel()
 
 	var body: some View {
-		ZStack {
-			background
-			card
-		}
-		.frame(minWidth: 560, minHeight: 360)
-		.padding(32)
-	}
-
-	private var background: some View {
-		LinearGradient(
-			colors: [Color.black.opacity(0.9), Color.blue.opacity(0.35), Color.black.opacity(0.85)],
-			startPoint: .topLeading,
-			endPoint: .bottomTrailing
-		)
-		.ignoresSafeArea()
+		card
+			.frame(minWidth: 560, minHeight: 360)
+			.onExitCommand {
+				NSApp.keyWindow?.orderOut(nil)
+			}
 	}
 
 	@ViewBuilder
@@ -28,16 +19,19 @@ struct ContentView: View {
 			transcriptBlock
 			controls
 		}
-		.padding(24)
 		.frame(maxWidth: 640)
+
+		let surface = content
+			.padding(24)
+			.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
 		if #available(macOS 26.0, *) {
 			GlassEffectContainer(spacing: 24) {
-				content
+				surface
 					.glassEffect(.regular.tint(.white.opacity(0.12)), in: .rect(cornerRadius: 24))
 			}
 		} else {
-			content
+			surface
 				.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
 		}
 	}
