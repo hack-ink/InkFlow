@@ -1,109 +1,43 @@
-# STT Dictation v2 – Debugging and Reproducible Test Workflow
+# STT Dictation – Debugging Workflow
 
-Date: 2025-12-17
+Date: 2026-01-16
 
-This document describes how to produce reproducible artifacts (audio + structured event traces) for dictation v2 issues such as:
+This document describes the current debugging workflow for the SwiftUI + Rust FFI stack.
+The pipeline specification remains in `docs/spec/stt_dictation_pipeline.md`.
 
-- Flicker or “module fighting” between sherpa partials, whisper sliding-window updates, and whisper second-pass replacements.
-- Unexpected transcript rewrites around endpoints/finalization.
-- Hallucinated text during long silence while still listening.
-- Sensitivity to speech rate (fast vs slow, long pauses).
+## 1. Run the macOS App Under Xcode
 
-The goal is to turn subjective reports into shareable, replayable evidence.
+- Open `apps/macos/InkFlow/InkFlow.xcodeproj`.
+- Select the `InkFlow` scheme.
+- Run with Cmd+R to attach the debugger and view logs.
 
-## 1. Enable a structured STT trace in the app
+If you need environment variables, add them under:
 
-The backend can write an NDJSON trace and the recorded session audio when tracing is enabled.
+- Product → Scheme → Edit Scheme… → Run → Arguments → Environment Variables.
 
-By default, whisper.cpp / GGML logs are silenced to keep traces readable. To re-enable them for investigation, set `INKFLOW_WHISPER_LOGS=1`.
+## 2. Smoke Test the Rust Engine (No UI)
 
-Enable tracing with one of the following:
+This test runs the engine directly and prints the precise initialization error without the UI layer.
+It is opt-in to avoid breaking default `cargo test` runs.
 
-- `INKFLOW_STT_TRACE=1` (writes into `tmp/stt_trace/`)
-- `INKFLOW_STT_TRACE_DIR=/absolute/or/relative/path` (custom directory)
+```sh
+INKFLOW_STT_SMOKE_TEST=1 cargo test -p inkflow-core --test stt_smoke -- --nocapture
+```
 
-Run the app from a terminal so logs and trace files are available:
+## 3. Capture Audio for Offline Analysis
 
-- `cargo make dev`
-- `cargo make dev-trace` (enables trace and writes into `tmp/stt_trace/` at the repository root)
+The most reliable way to reproduce transcription issues today is to capture audio and run it through the CLI harness.
 
-Note: `tmp/stt_trace/` is resolved relative to the process working directory. In the `cargo make dev` workflow this is typically under `src-tauri/`, so the default location is often `src-tauri/tmp/stt_trace/`. The backend prints the resolved absolute trace directory on session start (look for `STT trace enabled. Directory: ...`).
+1. Record a short WAV file (5–15 seconds). Keep the sample clean and label it clearly.
+2. Run the comparison harness:
 
-After a dictation session is finalized (`Enter`), look for:
+```sh
+cargo make stt-compare -- --manifest research/stt_compare/manifest.toml
+```
 
-- `tmp/stt_trace/stt_session_<SESSION_ID>.ndjson`
-- `tmp/stt_trace/stt_session_<SESSION_ID>.wav`
+This separates model behavior from UI rendering and makes regressions easier to spot.
 
-If the session is cancelled (`Escape` or losing focus), the WAV file is still written when tracing is enabled.
+## 4. Status of Structured Tracing
 
-### 1.1 macOS: trace WAV is silent
-
-If `stt_session_<ID>.wav` is completely silent (all zeros) even when you are speaking, check your system audio routing:
-
-- `system_profiler SPAudioDataType` (look for `Default Input Device` and `Default Output Device`).
-
-Some audio capture backends can accidentally bind to the default output device. If your default output is an external output-only device (for example a USB DAC), microphone capture may produce all-zero samples.
-
-To confirm quickly, run the comparison harness and look at the reported microphone stats:
-
-- `cargo make stt-compare-mic`
-
-It prints `mic_stats mean_abs=... peak_abs=...`. If `peak_abs` stays `0.000000` while speaking, the capture pipeline is not receiving microphone audio.
-
-## 2. What the trace contains
-
-The trace file is JSON Lines (one JSON object per line). Each line includes:
-
-- `t_ms`: milliseconds since session start.
-- `kind`: event category (`stt_partial`, `segment_commit`, `window_scheduled`, `endpoint_reset`, `stt_final`, etc.).
-- `revision`: present for `stt_partial` lines.
-- `strategy`: present for `stt_partial` lines (`vad_chunk` or `sliding_window`).
-- `text`: the full transcript text (matching the UI’s `stt/partial` payload) when applicable.
-- `details`: session-local counters (window generation, last scheduled/applied job id, and whether window text is active).
-
-This is intended to make “who changed the text, when, and why” explicit.
-
-Note: `segment_commit` lines should not have an empty `text` value. If you observe empty segment commits, treat it as a bug and include the trace as a regression case.
-See `docs/guide/testing/stt_dictation_trace_regressions.md` for known regression cases.
-
-## 3. Build a small, targeted reproduction set
-
-Create a few short recordings (5–15 seconds each). Keep them minimal and label them clearly.
-
-Recommended cases:
-
-1. **Fast speech, no long pauses**
-2. **Slow speech, long pauses between words**
-3. **Stop speaking but keep holding Space for 3–5 seconds**
-4. **Speak, then immediately release Space**
-5. **Quiet room silence (hold Space, say nothing for 5 seconds)**
-
-For each case, collect:
-
-- The `.wav` file.
-- The `.ndjson` trace.
-- A short note describing what you expected vs what happened.
-
-Avoid committing large audio files to the repository; store them locally and share as needed.
-
-## 4. Use the comparison harness on captured audio (optional)
-
-The workspace includes `stt-compare`, which can help separate engine behavior from merge behavior:
-
-- `cargo make stt-compare -- --manifest research/stt_compare/manifest.toml`
-
-You can also run it on a single WAV by editing/creating a local manifest that points to the captured `.wav`.
-
-## 5. How to report an issue with minimal ambiguity
-
-When reporting, include:
-
-- The trace and WAV file names.
-- The `kind` sequence around the problematic moment (timestamps).
-- The last 3–5 `stt_partial` lines before/after the rewrite.
-- Which behavior category it matches (flicker, finalization regression, silence hallucination, speech rate sensitivity).
-- A trace summary to highlight strategy switches and rewrites:
-  - `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --timeline`
-  - `python3 scripts/stt_trace_summary.py --path tmp/stt_trace/stt_session_X.ndjson --events`
-
-If you start a new session before the previous finalization completes, the previous session may emit a `finalize_detached` trace line. In that case, the WAV file is still written (when tracing is enabled), but the previous session may not produce a complete `stt_final` line.
+Structured trace capture is not yet wired into the SwiftUI + FFI pipeline.
+If trace capture is added later, this document will be updated with the new workflow.

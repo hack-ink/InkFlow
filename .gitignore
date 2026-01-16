@@ -4,6 +4,7 @@
 .worktrees
 
 # Editor
+xcuserdata
 .vscode
 .zed
 

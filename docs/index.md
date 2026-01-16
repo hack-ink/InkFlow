@@ -34,8 +34,3 @@ Audience: Engineers and LLMs reading the repository.
 ### Governance
 
 - Location: `docs/governance.md`.
-
-### Plans and drafts
-
-- Location: `docs/plans/`.
-- Status: No plan documents are present yet.

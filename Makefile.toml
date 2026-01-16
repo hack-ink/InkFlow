@@ -11,19 +11,15 @@ args = [
 [tasks.dev]
 workspace = false
 dependencies = ["setup-macos"]
-command = "cargo"
+command = "xcodebuild"
 args = [
-	"tauri",
-	"dev",
-]
-
-[tasks.dev-trace]
-workspace = false
-dependencies = ["setup-macos"]
-command = "bash"
-args = [
-	"-lc",
-	"export INKFLOW_STT_TRACE_DIR=\"$PWD/tmp/stt_trace\"; cargo tauri dev",
+	"-project",
+	"apps/macos/InkFlow/InkFlow.xcodeproj",
+	"-scheme",
+	"InkFlow",
+	"-configuration",
+	"Debug",
+	"build",
 ]
 
 [tasks.fmt]
@@ -58,11 +54,15 @@ args = [
 [tasks.release]
 workspace = false
 dependencies = ["setup-macos"]
-command = "cargo"
+command = "xcodebuild"
 args = [
-	"tauri",
-	"dev",
-	"--release"
+	"-project",
+	"apps/macos/InkFlow/InkFlow.xcodeproj",
+	"-scheme",
+	"InkFlow",
+	"-configuration",
+	"Release",
+	"build",
 ]
 
 [tasks.udeps]

@@ -142,7 +142,7 @@ if [[ ! -f "$ORT_DYLIB" ]]; then
   exit 1
 fi
 
-mkdir -p "$ROOT_DIR/model"
+mkdir -p "$ROOT_DIR/models"
 
 if [[ -d "$MODEL_DIR" ]]; then
   echo "Model directory already exists: $MODEL_DIR."
@@ -151,7 +151,7 @@ else
   curl -L --fail "$MODEL_URL" -o "$MODEL_TARBALL"
 
   echo "Extracting model to models/."
-  tar -xjf "$MODEL_TARBALL" -C "$ROOT_DIR/model"
+  tar -xjf "$MODEL_TARBALL" -C "$ROOT_DIR/models"
   rm -f "$MODEL_TARBALL"
 fi
 

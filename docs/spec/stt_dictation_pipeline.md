@@ -83,16 +83,16 @@ This document specifies the target architecture. Some parts already exist in cod
   - The last spoken segment finalizes quickly and reads "clean" (punctuation, fewer homophone errors).
   - Final text remains stable for downstream steps (rewrite/inject).
 
-### 1.2 Push-to-talk Lifecycle (UI-driven)
+### 1.2 Start/Stop Lifecycle (UI-driven)
 
-The UI implements push-to-talk (PTT) using keyboard events:
+The SwiftUI app controls dictation explicitly:
 
-- Space keydown triggers: `invoke("session_dispatch", { action: { type: "start_new" } })`.
-- Space keyup triggers: `invoke("session_dispatch", { action: { type: "enter" } })`.
+- Start: registers the FFI callback and begins microphone capture.
+- Stop: stops microphone capture and unregisters the callback.
 
-Backend is the single source of truth for state transitions and emitted text events.
+Backend is the single source of truth for transcript updates and timing.
 
-Code anchor: `ui/src/App.tsx`, `src-tauri/src/session.rs`.
+Code anchor: `apps/macos/InkFlow/InkFlow/ContentView.swift`, `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflow-ffi/src/lib.rs`.
 
 ### 1.3 Finalization Must Capture the Last Words (Forced Finalize)
 
@@ -113,40 +113,39 @@ This removes the "last words missing / last segment not cleaned up" failure mode
 
 ### 1.4 Text Update Semantics (What the UI Expects)
 
-UI expects a stream of `stt/partial` events that represent the **full current transcript**. It uses:
+UI receives JSON updates through the FFI callback. The SwiftUI app builds the displayed transcript from:
 
-- `revision` monotonicity to ignore stale updates.
-- A prefix-based delta computation to animate "append-only" growth:
-  - If new text is a strict prefix extension of previous text, UI animates appended suffix.
-  - If update is a rewrite (not prefix), UI delta is empty.
+- `sherpa_partial` and `window_result` for live text.
+- `segment_end` for committed segments.
+- `second_pass` to replace a committed segment with Whisper output.
 
 Implication:
 
-- Backend should prefer updates that are mostly append-only in the "live tail".
-- Backend must tolerate rewrites when accuracy improves (e.g., endpoint replacement).
+- The Rust engine should emit updates that are mostly append-only in the live tail.
+- The UI must tolerate rewrites when accuracy improves.
 
-Code anchor: `ui/src/App.tsx`, `src-tauri/src/events.rs`, `src-tauri/src/session.rs`.
+Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflow-ffi/src/lib.rs`.
 
 ---
 
 ## 2. Technology Stack and Key Libraries
 
-### 2.1 Frontend
+### 2.1 UI
 
-- React + TypeScript (Vite build).
-- Tauri v2 event/command bridge.
+- SwiftUI on macOS 26.
+- Liquid Glass for primary surfaces and controls.
 
 ### 2.2 Backend
 
 - Rust (edition 2024).
-- Tauri v2.
+- `inkflow-core` for pipeline logic.
+- `inkflow-ffi` for the C ABI callback bridge.
 - Tokio (async orchestration, channels, task spawning).
 
 ### 2.3 Audio
 
-- Microphone capture (macOS only): CoreAudio Voice Processing I/O (AudioUnit).
-  - Captures the default microphone with system voice processing (for example, noise suppression and automatic gain control).
-  - Produces mono `f32` samples.
+- Microphone capture on macOS using AVAudioEngine.
+- Produces mono `float32` buffers at the device sample rate.
 
 ### 2.4 STT Engines
 
@@ -163,48 +162,33 @@ Code anchor: `ui/src/App.tsx`, `src-tauri/src/events.rs`, `src-tauri/src/session
 
 ### 3.1 UI Component
 
-`ui/src/App.tsx`:
+`apps/macos/InkFlow/InkFlow`:
 
-- Listens to backend events:
-  - `session/state`, `stt/partial`, `stt/final`, `llm/rewrite`, `error`, optional `engine/state`.
-- Sends commands:
-  - `session_dispatch` (PTT and lifecycle).
-  - `overlay_set_height` (window resizing).
-  - Settings/engine commands (v2 recommended): `settings_get`, `settings_set`, `engine_apply_settings`.
-- Maintains per-session ordering using `revision`.
-- Updates visual feedback using `sttDelta` computed by prefix comparison.
+- Starts and stops dictation using explicit controls in SwiftUI.
+- Registers the FFI callback and renders transcript updates.
+- Dispatches all UI updates onto the main thread.
+- Uses Liquid Glass for primary surfaces and controls on macOS 26.
 
-### 3.2 Backend Session Manager
+### 3.2 Backend Engine
 
-`src-tauri/src/session.rs`:
+`crates/inkflow-core/src/engine.rs`:
 
-- Owns the session state machine and text buffers.
-- Spawns the listening pipeline when a session enters `Listening`.
-- Emits:
-  - `stt/partial` continuously.
-  - `stt/final` on finalization.
-- Maintains:
-  - `stt_segments: Vec<String>` (committed, ordered segments).
-  - `stt_live_text: String` (live tail text).
-  - `stt_revision: u64` (monotonic revision).
-  - `stt_live_stability_state` (stable prefix / unstable tail, v2).
-  - `committed_end_16k_samples: u64` (v2).
-  - `window_generation: u64` (v2).
-  - `window_job_id: u64` (v2).
+- Owns the STT pipeline and exposes `InkFlowEngine` for FFI use.
+- Receives audio buffers, manages sherpa streaming, and schedules Whisper work.
+- Emits JSON update events via the FFI layer.
+- Maintains segment and window state required for refinement and finalization.
 
 ### 3.3 Audio Capture
 
-`src-tauri/src/audio/mic_stream.rs`:
+`apps/macos/InkFlow/InkFlow/AudioCapture.swift`:
 
-- Captures microphone audio via the Voice Processing I/O audio unit on macOS.
-- Requests 48 kHz float32 mono when available.
-- Produces mono `f32` chunks via a bounded channel.
-- Records full-session audio for finalization and debugging.
+- Captures microphone audio via AVAudioEngine.
+- Requests mono float32 buffers at the device sample rate.
 
 ### 3.4 STT Wrappers and Configuration
 
-- Sherpa: `src-tauri/src/stt.rs`.
-- Whisper: `src-tauri/src/stt/whisper.rs`.
+- Sherpa: `crates/inkflow-core/src/stt/mod.rs`.
+- Whisper: `crates/inkflow-core/src/stt/whisper.rs`.
 
 ### 3.5 Engine Manager + Settings (v2 required)
 
@@ -505,15 +489,15 @@ Env-gated or settings-gated logs (no absolute paths):
 
 ## 11. Reference Code Locations
 
-- UI: `ui/src/App.tsx`
-- Session orchestration: `src-tauri/src/session.rs`
-- Events: `src-tauri/src/events.rs`
-- Mic capture: `src-tauri/src/audio/mic_stream.rs`
-- Sherpa: `src-tauri/src/stt.rs`.
-- Whisper: `src-tauri/src/stt/whisper.rs`.
+- UI: `apps/macos/InkFlow/InkFlow/ContentView.swift`
+- UI state and callbacks: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`
+- FFI bridge: `crates/inkflow-ffi/src/lib.rs`
+- Mic capture: `apps/macos/InkFlow/InkFlow/AudioCapture.swift`
+- Sherpa: `crates/inkflow-core/src/stt/mod.rs`.
+- Whisper: `crates/inkflow-core/src/stt/whisper.rs`.
 - Harness: `research/stt_compare/...`
-- Settings (v2): `src-tauri/src/settings.rs`
-- Engine manager (v2): `src-tauri/src/engine.rs`
+- Settings: `crates/inkflow-core/src/settings.rs`
+- Engine: `crates/inkflow-core/src/engine.rs`
 - Implementation notes: `docs/guide/development/stt_dictation_pipeline_impl_notes.md`
 
 ---

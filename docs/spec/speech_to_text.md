@@ -13,11 +13,11 @@ This document describes the speech-to-text integration used by InkFlow (sherpa-o
 
 ## Quick Start (macOS)
 
-Run:
+Build the macOS app:
 
 ```sh
 cargo make setup-macos
-cargo make dev
+xcodebuild -project apps/macos/InkFlow/InkFlow.xcodeproj -scheme InkFlow -configuration Debug build
 ```
 
 No environment variables are required for the default repository layout. The app will automatically locate:
@@ -27,6 +27,35 @@ No environment variables are required for the default repository layout. The app
 - The default whisper model in `models/whisper/ggml-large-v3-turbo-q8_0.bin` (or `INKFLOW_WHISPER_MODEL_PATH`).
 
 The `third_party/sherpa-onnx-prefix/` directory is a generated build artifact and is ignored by git.
+
+## Sandbox and Model Storage
+
+InkFlow targets the macOS App Sandbox for production releases. This impacts where models may be stored
+and how they are accessed at runtime.
+
+### Current Behavior
+
+- Debug builds may run without the app sandbox to allow a repository-local `models/` directory to be
+  symlinked into the app bundle resources for rapid iteration.
+- Release builds keep the app sandbox enabled and must use sandbox-legal model paths.
+
+### Planned Production Model Store
+
+InkFlow will store downloaded models inside the app container:
+
+- `~/Library/Application Support/InkFlow/models/`
+
+This directory is always accessible inside the sandbox and supports dynamic downloads and selection.
+
+### User-Selected External Models
+
+If users import models from arbitrary locations, InkFlow must:
+
+- Prompt with `NSOpenPanel` to select the model directory.
+- Store a security-scoped bookmark for future access.
+- Resolve the bookmark at runtime and pass the resulting absolute path to the Rust engine.
+
+This preserves sandbox compliance while supporting user-managed model libraries.
 
 ## Default Model (Streaming English)
 
@@ -81,6 +110,21 @@ These environment variables are optional overrides. InkFlow will use executable-
   - Default: auto-discovered.
   - Note: You can also rely on `DYLD_LIBRARY_PATH`, but `INKFLOW_SHERPA_ONNX_DYLIB` is the most explicit option.
 
+## Model Selection and Download (Planned)
+
+InkFlow will expose a model selector UI that lists available models and allows downloading new models.
+The selector will operate on a local registry stored alongside the model files.
+
+Planned responsibilities:
+
+- Maintain a `models.json` registry with model metadata (name, language, type, size, and path).
+- Download model archives into the app container (`Application Support/InkFlow/models`).
+- Verify required files (`tokens.txt`, encoder/decoder/joiner, whisper GGML file) before enabling a model.
+- Pass the selected model directory or file path to the Rust engine via configuration or environment
+  overrides.
+
+The repository default models remain valid for development but are not used in production builds.
+
 ## Two-pass Finalization (Whisper Second Pass)
 
 During dictation, InkFlow uses sherpa-onnx streaming to produce low-latency partial text and to detect endpoints. After each endpoint, InkFlow transcribes the corresponding audio segment using whisper-rs and replaces the provisional sherpa segment text with the whisper output.
@@ -115,8 +159,8 @@ The default path is auto-discovered relative to the running executable:
 ## Model Download (Reference)
 
 ```bash
-mkdir -p model
-cd model
+mkdir -p models
+cd models
 wget https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-21.tar.bz2
 tar xvf sherpa-onnx-streaming-zipformer-en-2023-06-21.tar.bz2
 rm sherpa-onnx-streaming-zipformer-en-2023-06-21.tar.bz2
@@ -185,6 +229,8 @@ cmake --install build-macos-min
 
 ## Repository Integration Notes
 
+- `crates/inkflow-core` owns the speech pipeline and model loading.
+- `crates/inkflow-ffi` exposes the C ABI used by the SwiftUI app.
 - `crates/sherpa-onnx-sys` generates bindings at build time from `vendor/sherpa_onnx_c_api.h`.
 - `crates/sherpa-onnx` loads the native library at runtime (`libloading`) and exposes:
   - `OnlineRecognizer`
@@ -192,8 +238,7 @@ cmake --install build-macos-min
   - `OnlineResult` parsed from the C API JSON output.
 - Endpointing defaults match the upstream streaming microphone demo:
   - rule1=2.4s, rule2=1.2s, rule3=300.0s.
-- Microphone capture defaults are tuned to match the upstream demo:
-  - Prefer 48 kHz input when supported, downmix to mono, clamp to `[-1.0, 1.0]`, and feed ~100 ms chunks.
+- Microphone capture in SwiftUI uses AVAudioEngine with mono float32 buffers.
 - Dynamic library lookup order (macOS):
   - `INKFLOW_SHERPA_ONNX_DYLIB` (if set).
   - App bundle `Contents/Frameworks/` (if packaged as `.app`).

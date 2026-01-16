@@ -1,0 +1,16 @@
+[package]
+name = "inkflow-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+sherpa-onnx = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "sync", "time"] }
+tokio-util = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { workspace = true, features = ["metal"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = { workspace = true }

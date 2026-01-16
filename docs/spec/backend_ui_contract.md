@@ -1,188 +1,126 @@
-# Backend and UI Contract (Events and Commands)
+# Backend and UI Contract (FFI)
 
-This document defines the event names, payload schemas, and command signatures that connect the Rust backend to the UI.
+This document defines the C ABI contract between the SwiftUI macOS app and the Rust speech engine.
 
-The backend is the single source of truth for session state. The UI should not implement its own session transitions beyond sending user intents.
+The Rust engine is the single source of truth for transcription events. The SwiftUI app must not implement its own recognition logic.
 
-## Event Names (Backend -> Frontend)
+## Header location
 
-All events include a `session_id` when a session exists.
+- `crates/inkflow-ffi/include/inkflow.h`
+- The SwiftUI app includes it via the bridging header `apps/macos/InkFlow/InkFlow/InkFlowBridge.h`.
 
-- `session/state`
-- `stt/partial`
-- `stt/final`
-- `llm/rewrite`
-- `error`
+## Status codes
 
-### `session/state`
+`inkflow.h` defines these status codes:
 
-Payload:
+- `INKFLOW_OK` = 0
+- `INKFLOW_ERR_NULL` = 1
+- `INKFLOW_ERR_INVALID_ARGUMENT` = 2
+- `INKFLOW_ERR_INTERNAL` = 3
 
-```ts
-export type SessionState =
-  | "Hidden"
-  | "Showing"
-  | "Listening"
-  | "Finalizing"
-  | "Rewriting"
-  | "RewriteReady"
-  | "Injecting"
-  | "Error";
+## C ABI functions
 
-export type SessionStateEvent = {
-  session_id: string;
-  state: SessionState;
-  reason?: string;
-};
+```c
+InkFlowHandle *inkflow_engine_create(void);
+void inkflow_engine_destroy(InkFlowHandle *handle);
+
+int32_t inkflow_engine_submit_audio(
+  InkFlowHandle *handle,
+  const float *samples,
+  size_t sample_count,
+  uint32_t sample_rate_hz
+);
+
+int32_t inkflow_engine_register_callback(
+  InkFlowHandle *handle,
+  inkflow_update_cb callback,
+  void *user_data
+);
+
+void inkflow_engine_unregister_callback(InkFlowHandle *handle);
 ```
 
-### `stt/partial`
+## Audio input contract
 
-Payload:
+- Format: mono `float32` PCM.
+- Sample rate: device sample rate, passed on every submission.
+- Sample rate must remain constant for the session.
+- The Rust engine resamples to 16 kHz internally for sherpa-onnx and whisper.
 
-```ts
-export type SttStrategy = "vad_chunk" | "sliding_window";
+## Callback contract
 
-export type SttPartialEvent = {
-  session_id: string;
-  text: string;
-  revision: number;
-  strategy: SttStrategy;
-};
-```
+- `inkflow_update_cb` is invoked on a **background thread**.
+- The `utf8` string is valid only for the duration of the callback.
+- The SwiftUI app must dispatch UI updates onto the main thread.
 
-### `stt/final`
+### Update payload format (JSON)
 
-Payload:
+The callback delivers JSON strings. Each payload has a `kind` and optional fields.
 
-```ts
-export type SttFinalEvent = {
-  session_id: string;
-  text: string;
-};
-```
+Common shape:
 
-### `llm/rewrite`
-
-Payload:
-
-```ts
-export type LlmRewriteEvent = {
-  session_id: string;
-  text: string;
-  model: string;
-};
-```
-
-### `error`
-
-Payload:
-
-```ts
-export type ErrorEvent = {
-  session_id?: string;
-  code: string;
-  message: string;
-  recoverable: boolean;
-};
-```
-
-## Commands (Frontend -> Backend)
-
-The UI sends intent, the backend executes and emits state updates.
-
-### `overlay_set_height`
-
-Resize the overlay window to a specific logical height.
-
-Payload:
-
-```ts
-export type OverlaySetHeightArgs = {
-  height: number;
-  animate: boolean;
-};
-```
-
-Rust signature skeleton:
-
-```rust
-#[tauri::command]
-async fn overlay_set_height(
-  app: tauri::AppHandle,
-  height: f64,
-  animate: bool,
-) -> Result<(), AppError> {
-  // Implementation is platform-specific.
-  Ok(())
+```json
+{
+  "kind": "sherpa_partial",
+  "text": "hello world"
 }
 ```
 
-Notes:
+#### `sherpa_partial`
 
-- The UI should measure its expanded content and request an exact window height.
-- On macOS, prefer native window animations for smooth resizing.
-
-### `session_dispatch`
-
-Intent payload:
-
-```ts
-export type SessionAction =
-  | { type: "show" }
-  | { type: "start_new" }
-  | { type: "enter" }
-  | { type: "escape" }
-  | { type: "rewrite" };
+```json
+{ "kind": "sherpa_partial", "text": "partial text" }
 ```
 
-Return payload:
+#### `window_result`
 
-```ts
-export type SessionSnapshot = {
-  session_id?: string;
-  state: SessionState;
-  raw_text: string;
-  rewrite_text?: string;
-};
-```
-
-Rust signature skeleton:
-
-```rust
-#[tauri::command]
-async fn session_dispatch(
-  app: tauri::AppHandle,
-  state: tauri::State<'_, AppState>,
-  action: SessionAction,
-) -> Result<SessionSnapshot, AppError> {
-  state.session().dispatch(&app, action).await
+```json
+{
+  "kind": "window_result",
+  "snapshot": {
+    "engine_generation": 1,
+    "window_generation": 2,
+    "job_id": 3,
+    "window_end_16k_samples": 64000,
+    "window_len_16k_samples": 64000,
+    "context_len_16k_samples": 12800
+  },
+  "result": {
+    "text": "window transcript",
+    "has_timestamps": true,
+    "segments": [
+      { "t0_ms": 0, "t1_ms": 1200, "text": "Hello" }
+    ]
+  }
 }
 ```
 
-### Settings
+#### `segment_end`
 
-`settings_get() -> Settings`
+```json
+{
+  "kind": "segment_end",
+  "segment_id": 5,
+  "text": "sherpa segment",
+  "committed_end_16k_samples": 96000,
+  "window_generation_after": 4
+}
+```
 
-`settings_update(patch: SettingsPatch) -> Settings`
+#### `second_pass`
 
-Rules:
+```json
+{ "kind": "second_pass", "segment_id": 5, "text": "whisper replacement" }
+```
 
-- Never return the API key plaintext back to the frontend.
-- Expose a boolean like `llm.has_api_key` for UI state.
+#### `endpoint_reset`
 
-### Permissions / System Settings (macOS only)
+```json
+{ "kind": "endpoint_reset", "window_generation_after": 5 }
+```
 
-`platform_open_system_settings(target: "microphone" | "accessibility" | "input_monitoring") -> ()`
+#### `error`
 
-## Hotkey (Option+Space)
-
-Hotkey handling is on the backend. When triggered:
-
-1. If the overlay is already visible, hide it by dispatching `SessionAction::Escape`.
-2. Otherwise, show the overlay window and dispatch `SessionAction::Show`.
-3. The UI handles Space press/release to dispatch `SessionAction::StartNew` and `SessionAction::Enter`.
-
-The overlay window should hide when it loses focus (Spotlight-like behavior).
-
-The UI should not be responsible for global hotkey registration.
+```json
+{ "kind": "error", "code": "stt_decode_failed", "message": "..." }
+```

@@ -1,15 +1,16 @@
 [workspace]
 members = [
+	"crates/inkflow-core",
+	"crates/inkflow-ffi",
 	"crates/sherpa-onnx",
 	"crates/sherpa-onnx-sys",
 	"research/stt_compare",
-	"src-tauri",
 ]
 resolver = "3"
 
 [workspace.package]
 authors     = ["Xavier Lau <x@acg.box>"]
-description = "InkFlow is a macOS-first, local dictation overlay (SuperWhisper-like) built with Rust and Tauri."
+description = "InkFlow is a macOS-first, local dictation overlay (SuperWhisper-like) built with SwiftUI and Rust via FFI."
 edition     = "2024"
 homepage    = "https://github.com/hack-ink/InkFlow"
 license     = "GPL-3.0"
@@ -33,10 +34,6 @@ reqwest                      = { version = "0.12", features = ["json"] }
 rig                          = { package = "rig-core", version = "0.27" }
 serde                        = { version = "1.0", features = ["derive"] }
 serde_json                   = { version = "1.0" }
-tauri                        = { version = "2.9" }
-tauri-build                  = { version = "2.5" }
-tauri-plugin-global-shortcut = { version = "2.3" }
-tauri-plugin-log             = { version = "2.7" }
 tokio                        = { version = "1.48", features = ["sync", "time"] }
 tokio-util                   = { version = "0.7" }
 toml                         = { version = "0.9" }

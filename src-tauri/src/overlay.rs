@@ -1,1 +1,0 @@
-pub const COLLAPSED_HEIGHT_LOGICAL: f64 = 64.0;

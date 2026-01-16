@@ -1,152 +1,108 @@
 # Setup and Configuration
 
-This document provides example configuration fragments for the first working implementation.
+This document captures the SwiftUI + Rust FFI configuration used by InkFlow.
 
-## `src-tauri/tauri.conf.json` (Essential Fields)
+## Xcode Project (apps/macos/InkFlow)
 
-Notes:
+Key build settings:
 
-- `app.macOSPrivateApi = true` enables macOS private APIs required for transparent windows.
-- `transparent = true` is required for window effects.
-- `windowEffects` applies the glass material; adjust for your preferred look.
+- Bundle identifier: `ink.hack.inkflow`.
+- Bridging header: `InkFlow/InkFlowBridge.h`.
+- Header search path: `$(SRCROOT)/../../../crates/inkflow-ffi/include`.
+- Run Script phase: build `inkflow-ffi`, copy `libinkflow_ffi.dylib`, stage sherpa-onnx and ONNX Runtime dylibs, and link `models/` into app resources for development.
 
-```json
-{
-  "$schema": "./gen/schemas/config.schema.json",
-  "productName": "InkFlow",
-  "version": "0.1.0",
-  "identifier": "ink.hack.inkflow",
-  "build": {
-    "frontendDist": "../ui/dist",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "deno task --cwd ../ui dev",
-    "beforeBuildCommand": "deno task --cwd ../ui build",
-    "removeUnusedCommands": true
-  },
-  "app": {
-    "withGlobalTauri": true,
-    "macOSPrivateApi": true,
-    "windows": [
-      {
-        "label": "main",
-        "url": "index.html",
-        "visible": false,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "width": 720,
-        "height": 64,
-        "title": "InkFlow",
-        "shadow": true,
-        "windowEffects": {
-          "effects": ["hudWindow"],
-          "state": "active",
-          "radius": 14
-        }
-      }
-    ]
-  }
-}
-```
+### Run Script Phase (Build inkflow-ffi)
 
-## `src-tauri/capabilities/default.json` (Minimal Example)
-
-This must be tailored after commands and plugins are added. Use the generated schema for autocompletion.
-
-```json
-{
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Default capabilities for the main (overlay) window.",
-  "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "allow-overlay-set-height",
-    "allow-session-dispatch",
-    "allow-settings-get",
-    "allow-settings-update",
-    "allow-platform-open-system-settings"
-  ]
-}
-```
-
-## `src-tauri/permissions/*.toml` (App Command Permissions)
-
-App-level `tauri::command` entries must be declared as permissions before they can be referenced by capabilities.
-
-Example (`src-tauri/permissions/app.toml`):
-
-```toml
-[[permission]]
-identifier = "allow-session-dispatch"
-description = "Enables the session_dispatch command."
-commands.allow = ["session_dispatch"]
-```
-
-## `src-tauri/Info.plist` (Microphone)
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>InkFlow needs microphone access to transcribe your speech into text.</string>
-```
-
-## `src-tauri/Cargo.toml` (Feature Gates)
-
-Recommended structure:
-
-```toml
-[features]
-default = ["platform-macos"]
-platform-macos = []
-platform-windows = []
-platform-linux = []
-```
-
-## `ui/deno.json` (Deno Tasks + nodeModulesDir)
-
-This is the preferred approach for running UI tooling with Deno.
-
-```json
-{
-  "nodeModulesDir": "auto",
-  "tasks": {
-    "dev": "vite --port 1420 --strictPort",
-    "build": "vite build",
-    "preview": "vite preview --port 1420 --strictPort",
-    "fmt": "deno fmt",
-    "lint": "deno lint"
-  }
-}
-```
-
-## UI Dependencies (Recommended)
-
-This is the baseline dependency set for “liquid glass” + smooth animations:
-
-- `react`, `react-dom`
-- `@tauri-apps/api`
-- `vite`, `@vitejs/plugin-react`
-- `tailwindcss`, `postcss`, `autoprefixer`
-- `framer-motion`
-- `@radix-ui/react-dialog`, `@radix-ui/react-popover` (and other primitives as needed)
-- `clsx` (class composition)
-- `lucide-react` (icons)
-
-Install using Deno local installation (example):
+This is the canonical script used in the Xcode build phase.
 
 ```sh
-cd ui
-deno install --dev npm:vite npm:@vitejs/plugin-react
-deno install npm:react npm:react-dom
-deno install npm:@tauri-apps/api
-deno install npm:tailwindcss npm:postcss npm:autoprefixer
-deno install npm:framer-motion
-deno install npm:@radix-ui/react-dialog npm:@radix-ui/react-popover
-deno install npm:clsx npm:lucide-react
+set -euo pipefail
+ROOT_DIR=${SRCROOT}/../../..
+CONFIG=${CONFIGURATION}
+TARGET_DIR=${ROOT_DIR}/target
+
+if command -v /bin/zsh >/dev/null 2>&1; then
+  eval "$(/bin/zsh -lc 'printf "export PATH=%q\n" "$PATH"')"
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo is not available in the Xcode build environment." >&2
+  echo "Install Rust or ensure $HOME/.cargo/bin is on PATH." >&2
+  exit 1
+fi
+
+if [ "${CONFIG}" = "Release" ]; then
+  cargo build -p inkflow-ffi --release --manifest-path "${ROOT_DIR}/Cargo.toml"
+  LIB_PATH=${TARGET_DIR}/release/libinkflow_ffi.dylib
+  DEPS_LIB_PATH=${TARGET_DIR}/release/deps/libinkflow_ffi.dylib
+else
+  cargo build -p inkflow-ffi --manifest-path "${ROOT_DIR}/Cargo.toml"
+  LIB_PATH=${TARGET_DIR}/debug/libinkflow_ffi.dylib
+  DEPS_LIB_PATH=${TARGET_DIR}/debug/deps/libinkflow_ffi.dylib
+fi
+
+if [ ! -f "${LIB_PATH}" ]; then
+  echo "InkFlow FFI library not found at ${LIB_PATH}." >&2
+  exit 1
+fi
+
+install_name_tool -id @rpath/libinkflow_ffi.dylib "${LIB_PATH}"
+if [ -f "${DEPS_LIB_PATH}" ]; then
+  install_name_tool -id @rpath/libinkflow_ffi.dylib "${DEPS_LIB_PATH}"
+fi
+
+cp -f "${LIB_PATH}" "${BUILT_PRODUCTS_DIR}/libinkflow_ffi.dylib"
+mkdir -p "${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks"
+cp -f "${LIB_PATH}" "${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libinkflow_ffi.dylib"
+
+SHERPA_DYLIB_SOURCE="${ROOT_DIR}/third_party/sherpa-onnx-prefix/lib/libsherpa-onnx-c-api.dylib"
+SHERPA_DYLIB_DEST="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libsherpa-onnx-c-api.dylib"
+if [ ! -f "${SHERPA_DYLIB_SOURCE}" ]; then
+  echo "Sherpa-onnx C API library not found at ${SHERPA_DYLIB_SOURCE}." >&2
+  echo "Run cargo make setup-macos to build the native libraries." >&2
+  exit 1
+fi
+cp -f "${SHERPA_DYLIB_SOURCE}" "${SHERPA_DYLIB_DEST}"
+
+ONNX_DYLIB_SOURCE="${ROOT_DIR}/third_party/sherpa-onnx-prefix/lib/libonnxruntime.1.17.1.dylib"
+ONNX_DYLIB_DEST="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libonnxruntime.1.17.1.dylib"
+if [ ! -f "${ONNX_DYLIB_SOURCE}" ]; then
+  echo "ONNX Runtime library not found at ${ONNX_DYLIB_SOURCE}." >&2
+  echo "Run cargo make setup-macos to build the native libraries." >&2
+  exit 1
+fi
+cp -f "${ONNX_DYLIB_SOURCE}" "${ONNX_DYLIB_DEST}"
+ln -sf libonnxruntime.1.17.1.dylib "${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libonnxruntime.dylib"
+
+MODELS_SOURCE="${ROOT_DIR}/models"
+MODELS_DEST="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/models"
+if [ -d "${MODELS_SOURCE}" ]; then
+  rm -rf "${MODELS_DEST}"
+  ln -s "${MODELS_SOURCE}" "${MODELS_DEST}"
+fi
 ```
 
-## Cargo Make (Repository Rule)
+## Info.plist (Microphone Usage)
+
+Configure the microphone usage string via the Xcode build setting:
+
+- `INFOPLIST_KEY_NSMicrophoneUsageDescription = "InkFlow needs microphone access to transcribe your speech into text."`
+
+## Code Signing Entitlements
+
+The macOS app uses separate entitlements for Debug and Release:
+
+- `apps/macos/InkFlow/InkFlow/InkFlow.Debug.entitlements` (Debug)
+- `apps/macos/InkFlow/InkFlow/InkFlow.entitlements` (Release)
+
+Debug disables the app sandbox so the app can read local `models/` assets via the symlinked
+Resources directory. Release keeps the app sandbox enabled.
+
+## FFI Headers
+
+- The C ABI header lives at `crates/inkflow-ffi/include/inkflow.h`.
+- The Swift bridging header lives at `apps/macos/InkFlow/InkFlow/InkFlowBridge.h` and includes `inkflow.h`.
+
+## Cargo Make (Repository Rules)
 
 Use these tasks for Rust formatting and validation:
 

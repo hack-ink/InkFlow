@@ -1,0 +1,392 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		70E4BF1F10C214248C42F841 /* libinkflow_ffi.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = C3C7CA1D9FD1DB07EB1CECC7 /* libinkflow_ffi.dylib */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		25BFAEFF2F194CFB00552305 /* InkFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InkFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3C7CA1D9FD1DB07EB1CECC7 /* libinkflow_ffi.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libinkflow_ffi.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		25BFAF012F194CFB00552305 /* InkFlow */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = InkFlow;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		25BFAEFC2F194CFB00552305 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				70E4BF1F10C214248C42F841 /* libinkflow_ffi.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		25BFAEF62F194CFB00552305 = {
+			isa = PBXGroup;
+			children = (
+				25BFAF012F194CFB00552305 /* InkFlow */,
+				7368E61AC7FD882779B5FC82 /* Frameworks */,
+				25BFAF002F194CFB00552305 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		25BFAF002F194CFB00552305 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				25BFAEFF2F194CFB00552305 /* InkFlow.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7368E61AC7FD882779B5FC82 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C3C7CA1D9FD1DB07EB1CECC7 /* libinkflow_ffi.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		25BFAEFE2F194CFB00552305 /* InkFlow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 25BFAF0A2F194CFC00552305 /* Build configuration list for PBXNativeTarget "InkFlow" */;
+			buildPhases = (
+				1B79D12B68C225EAF85AB7A9 /* ShellScript */,
+				25BFAEFB2F194CFB00552305 /* Sources */,
+				25BFAEFC2F194CFB00552305 /* Frameworks */,
+				25BFAEFD2F194CFB00552305 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				25BFAF012F194CFB00552305 /* InkFlow */,
+			);
+			name = InkFlow;
+			packageProductDependencies = (
+			);
+			productName = InkFlow;
+			productReference = 25BFAEFF2F194CFB00552305 /* InkFlow.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		25BFAEF72F194CFB00552305 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					25BFAEFE2F194CFB00552305 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 25BFAEFA2F194CFB00552305 /* Build configuration list for PBXProject "InkFlow" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 25BFAEF62F194CFB00552305;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 25BFAF002F194CFB00552305 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				25BFAEFE2F194CFB00552305 /* InkFlow */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		25BFAEFD2F194CFB00552305 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1B79D12B68C225EAF85AB7A9 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libinkflow_ffi.dylib",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Frameworks/libinkflow_ffi.dylib",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Frameworks/libsherpa-onnx-c-api.dylib",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Frameworks/libonnxruntime.1.17.1.dylib",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Frameworks/libonnxruntime.dylib",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/models",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nROOT_DIR=${SRCROOT}/../../..\nCONFIG=${CONFIGURATION}\nTARGET_DIR=${ROOT_DIR}/target\nif command -v /bin/zsh >/dev/null 2>&1; then\n  eval \"$(/bin/zsh -lc 'printf \"export PATH=%q\\\\n\" \"$PATH\"')\"\nfi\nif ! command -v cargo >/dev/null 2>&1; then\n  echo \"cargo is not available in the Xcode build environment.\" >&2\n  echo \"Install Rust or ensure $HOME/.cargo/bin is on PATH.\" >&2\n  exit 1\nfi\nif [ \"${CONFIG}\" = \"Release\" ]; then\n  cargo build -p inkflow-ffi --release --manifest-path \"${ROOT_DIR}/Cargo.toml\"\n  LIB_PATH=${TARGET_DIR}/release/libinkflow_ffi.dylib\n  DEPS_LIB_PATH=${TARGET_DIR}/release/deps/libinkflow_ffi.dylib\nelse\n  cargo build -p inkflow-ffi --manifest-path \"${ROOT_DIR}/Cargo.toml\"\n  LIB_PATH=${TARGET_DIR}/debug/libinkflow_ffi.dylib\n  DEPS_LIB_PATH=${TARGET_DIR}/debug/deps/libinkflow_ffi.dylib\nfi\nif [ ! -f \"${LIB_PATH}\" ]; then\n  echo \"InkFlow FFI library not found at ${LIB_PATH}.\" >&2\n  exit 1\nfi\ninstall_name_tool -id @rpath/libinkflow_ffi.dylib \"${LIB_PATH}\"\nif [ -f \"${DEPS_LIB_PATH}\" ]; then\n  install_name_tool -id @rpath/libinkflow_ffi.dylib \"${DEPS_LIB_PATH}\"\nfi\nmkdir -p \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks\"\ncp -f \"${LIB_PATH}\" \"${BUILT_PRODUCTS_DIR}/libinkflow_ffi.dylib\"\ncp -f \"${LIB_PATH}\" \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libinkflow_ffi.dylib\"\nSHERPA_DYLIB_SOURCE=\"${ROOT_DIR}/third_party/sherpa-onnx-prefix/lib/libsherpa-onnx-c-api.dylib\"\nSHERPA_DYLIB_DEST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libsherpa-onnx-c-api.dylib\"\nif [ ! -f \"${SHERPA_DYLIB_SOURCE}\" ]; then\n  echo \"Sherpa-onnx C API library not found at ${SHERPA_DYLIB_SOURCE}.\" >&2\n  echo \"Run cargo make setup-macos to build the native libraries.\" >&2\n  exit 1\nfi\ncp -f \"${SHERPA_DYLIB_SOURCE}\" \"${SHERPA_DYLIB_DEST}\"\nONNX_DYLIB_SOURCE=\"${ROOT_DIR}/third_party/sherpa-onnx-prefix/lib/libonnxruntime.1.17.1.dylib\"\nONNX_DYLIB_DEST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libonnxruntime.1.17.1.dylib\"\nif [ ! -f \"${ONNX_DYLIB_SOURCE}\" ]; then\n  echo \"ONNX Runtime library not found at ${ONNX_DYLIB_SOURCE}.\" >&2\n  echo \"Run cargo make setup-macos to build the native libraries.\" >&2\n  exit 1\nfi\ncp -f \"${ONNX_DYLIB_SOURCE}\" \"${ONNX_DYLIB_DEST}\"\nln -sf libonnxruntime.1.17.1.dylib \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Frameworks/libonnxruntime.dylib\"\nMODELS_SOURCE=\"${ROOT_DIR}/models\"\nMODELS_DEST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/models\"\nif [ -d \"${MODELS_SOURCE}\" ]; then\n  rm -rf \"${MODELS_DEST}\"\n  ln -s \"${MODELS_SOURCE}\" \"${MODELS_DEST}\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		25BFAEFB2F194CFB00552305 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		25BFAF082F194CFC00552305 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = T54QFA7W2S;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		25BFAF092F194CFC00552305 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = T54QFA7W2S;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		25BFAF0B2F194CFC00552305 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "InkFlow/InkFlow.Debug.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T54QFA7W2S;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../../crates/inkflow-ffi/include",
+				);
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "InkFlow needs access to the microphone for live dictation.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ink.hack.inkflow;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = InkFlow/InkFlowBridge.h;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		25BFAF0C2F194CFC00552305 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "InkFlow/InkFlow.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T54QFA7W2S;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../../crates/inkflow-ffi/include",
+				);
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "InkFlow needs access to the microphone for live dictation.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ink.hack.inkflow;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = InkFlow/InkFlowBridge.h;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		25BFAEFA2F194CFB00552305 /* Build configuration list for PBXProject "InkFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25BFAF082F194CFC00552305 /* Debug */,
+				25BFAF092F194CFC00552305 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		25BFAF0A2F194CFC00552305 /* Build configuration list for PBXNativeTarget "InkFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25BFAF0B2F194CFC00552305 /* Debug */,
+				25BFAF0C2F194CFC00552305 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 25BFAEF72F194CFB00552305 /* Project object */;
+}

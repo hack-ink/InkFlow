@@ -18,6 +18,6 @@ Audience: Engineers and LLMs looking for procedures, setup steps, and debugging 
 
 ## Testing and debugging
 
-- `docs/guide/testing/stt_dictation_pipeline_debugging.md` - Debugging workflow (trace + WAV capture).
-- `docs/guide/testing/stt_dictation_trace_regressions.md` - Trace-based regression cases and fixes.
+- `docs/guide/testing/stt_dictation_pipeline_debugging.md` - Debugging workflow (Xcode + offline harness).
+- `docs/guide/testing/stt_dictation_trace_regressions.md` - Placeholder for trace-based regressions once tracing is available.
 - `docs/guide/testing/stt_comparison_harness.md` - STT A/B comparison harness usage (`stt-compare`).

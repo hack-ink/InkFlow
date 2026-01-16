@@ -16,13 +16,12 @@ repository.
 | --- | --- | --- | --- |
 | Spec | `docs/spec/` | Contracts, schemas, pipeline behavior, invariants | Any behavior or schema change |
 | Operational docs | `docs/guide/` | Runbooks, pipeline walkthroughs, maintenance | When operating procedures change |
-| Plans | `docs/plans/` | Draft plans and design notes (non-normative) | As-needed, may drift |
 
 ## Placement rules
 
 - If it defines a contract, it belongs in `docs/spec/`.
 - If it explains how to run or maintain a system, it belongs in `docs/guide/`.
-- If it is temporary or exploratory, it belongs in `docs/plans/`.
+- Avoid temporary plan documents. Capture decisions in specs or guides instead.
 - Module documentation must live under `docs/guide/` and be linked from `docs/guide/index.md`.
   Do not add module-level README files.
 - Do not duplicate the same content in both spec and guide files. Spec defines what must be true;
@@ -54,5 +53,3 @@ When answering questions about system behavior:
 - Spec files use descriptive `snake_case` names. Avoid numeric prefixes.
 - Guide files use descriptive `snake_case` names within their category folders
   (`development/`, `operations/`, `pipelines/`, `testing/`).
-- Plan files use `YYYY-MM-DD_<topic>_<type>.md` with `snake_case` topics (for example,
-  `2026-01-01_cryptopotato_crawler_plan.md`).
