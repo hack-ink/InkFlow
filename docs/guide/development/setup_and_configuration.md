@@ -97,6 +97,9 @@ The macOS app uses separate entitlements for Debug and Release:
 Debug disables the app sandbox so the app can read local `models/` assets via the symlinked
 Resources directory. Release keeps the app sandbox enabled.
 
+Both Debug and Release entitlements must include `com.apple.security.device.audio-input` to
+allow microphone access when Hardened Runtime is enabled.
+
 ## FFI Headers
 
 - The C ABI header lives at `crates/inkflow-ffi/include/inkflow.h`.

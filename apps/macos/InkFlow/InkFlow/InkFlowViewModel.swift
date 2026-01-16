@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 
@@ -149,4 +150,5 @@ final class InkFlowViewModel: ObservableObject {
 			transcript = committed + " " + live
 		}
 	}
+
 }
