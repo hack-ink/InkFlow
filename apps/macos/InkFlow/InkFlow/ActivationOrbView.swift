@@ -1,110 +1,223 @@
+import CoreText
 import SwiftUI
 
 struct ActivationOrbView: View {
 	let isActive: Bool
 
 	var body: some View {
-		CollisionOrbView(isActive: isActive)
-			.frame(width: 28, height: 28)
+		LetterMorphOrbView(isActive: isActive)
+			.frame(width: 38, height: 38)
 	}
 }
 
-private struct CollisionOrbView: View {
+private struct LetterMorphOrbView: View {
 	let isActive: Bool
+	@State private var startTime = Date().timeIntervalSinceReferenceDate
 
 	var body: some View {
 		TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
 			Canvas { context, size in
 				let now = timeline.date.timeIntervalSinceReferenceDate
+				let time = now - startTime
 				let center = CGPoint(x: size.width / 2, y: size.height / 2)
-				let maxRadius = min(size.width, size.height) * 0.42
-				let particles = particleStates(now: now, center: center, maxRadius: maxRadius)
+				let palette = LetterPalette(isActive: isActive)
+				let rotationPeriod: TimeInterval = 6.0
+				let letterPeriod = rotationPeriod
+				let rotation = time * (Double.pi * 2.0 / rotationPeriod)
+				let tilt = 0.14
+				let scale = min(size.width, size.height) * 0.88
 
 				context.blendMode = .plusLighter
-				drawParticles(context: &context, particles: particles)
-				drawSparks(context: &context, particles: particles)
+
+				let points = letterPoints(at: time, letterPeriod: letterPeriod)
+				let layers: [(depth: Double, weight: CGFloat)] = [
+					(-0.12, 0.6),
+					(-0.06, 0.8),
+					(0.0, 1.0),
+					(0.06, 0.8),
+					(0.12, 0.6)
+				]
+				var transformedPoints: [TransformedPoint] = []
+				transformedPoints.reserveCapacity(points.count * layers.count)
+
+				for (index, point) in points.enumerated() {
+					let seed = Double(index) * 0.61803398875
+					let drift = sin(time * 0.8 + seed * 2.3) * 0.004
+					let base = CGPoint(x: point.x + drift, y: point.y - drift)
+					let baseDepth = Double(base.x) * 0.32
+					for (layerIndex, layer) in layers.enumerated() {
+						let jitter = (rand(seed * 6.7 + Double(layerIndex) * 1.9) - 0.5) * 0.04
+						let transformed = transformPoint(
+							base: base,
+							depth: baseDepth + layer.depth + jitter,
+							rotation: rotation,
+							tilt: tilt
+						)
+						transformedPoints.append(
+							TransformedPoint(
+								point: transformed.point,
+								perspective: transformed.perspective,
+								depth: transformed.depth,
+								weight: layer.weight,
+								face: transformed.face
+							)
+						)
+					}
+				}
+
+				var average = CGPoint.zero
+				var totalWeight: CGFloat = 0.0
+				for point in transformedPoints {
+					average.x += point.point.x * point.weight
+					average.y += point.point.y * point.weight
+					totalWeight += point.weight
+				}
+				if totalWeight > 0.0 {
+					average.x /= totalWeight
+					average.y /= totalWeight
+				}
+
+				var particles: [LetterParticle] = []
+				particles.reserveCapacity(transformedPoints.count)
+				for transformed in transformedPoints {
+					let perspective = transformed.perspective
+					let position = CGPoint(
+						x: center.x + (transformed.point.x - average.x) * scale,
+						y: center.y + (transformed.point.y - average.y) * scale
+					)
+					let face = (0.15 + 0.85 * transformed.face)
+					let size = (isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective) * (0.85 + 0.15 * face)
+					let light = clamp(0.7 + transformed.depth * 0.9, min: 0.45, max: 1.0)
+					let alpha = (isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light * face
+					let usesAccent = light > 0.84
+
+					particles.append(
+						LetterParticle(position: position, size: size, alpha: alpha, usesAccent: usesAccent)
+					)
+				}
+
+				particles.sort { $0.alpha < $1.alpha }
+				drawGlow(context: &context, particles: particles, palette: palette)
+				drawParticles(context: &context, particles: particles, palette: palette)
 			}
 		}
 	}
 
-	private func particleStates(
-		now: TimeInterval,
-		center: CGPoint,
-		maxRadius: CGFloat
-	) -> [OrbParticle] {
-		let count = isActive ? 22 : 16
-		let baseSpeed = isActive ? 0.9 : 0.55
-		let jitter = isActive ? 2.2 : 1.4
-		var result: [OrbParticle] = []
-		result.reserveCapacity(count)
-		for index in 0..<count {
-			let seed = Double(index) * 0.61803398875
-			let speed = baseSpeed + fract(sin(seed * 12.3) * 13.7) * 0.6
-			let angle = now * speed + seed * Double.pi * 2
-			let radial = maxRadius * CGFloat(0.35 + 0.6 * fract(sin(seed * 78.2) * 43758.5453))
-			let wobble = sin(now * 1.6 + seed * 9.0) * jitter
-			let x = center.x + cos(angle) * radial + CGFloat(wobble)
-			let y = center.y + sin(angle * 1.1) * radial + CGFloat(wobble)
-			let size = isActive ? 1.6 : 1.2
-			let intensity = 0.6 + 0.4 * CGFloat(fract(sin(seed * 31.7) * 24634.6345))
-			result.append(OrbParticle(position: CGPoint(x: x, y: y), size: size, intensity: intensity))
+	private func letterPoints(at time: TimeInterval, letterPeriod: TimeInterval) -> [CGPoint] {
+		let morphDuration: TimeInterval = letterPeriod * 0.5
+		let sequence = LetterCache.sequence
+		let index = Int(time / letterPeriod) % sequence.count
+		let nextIndex = (index + 1) % sequence.count
+		let phase = time.truncatingRemainder(dividingBy: letterPeriod)
+		let morphStart = letterPeriod - morphDuration
+		let rawProgress = max(0.0, (phase - morphStart) / morphDuration)
+		let progress = smoothstep(rawProgress)
+
+		let from = LetterCache.points[index]
+		let to = LetterCache.points[nextIndex]
+		if from.isEmpty {
+			return to
 		}
-		return result
+		if to.isEmpty {
+			return from
+		}
+
+		return zip(from, to).map { start, end in
+			CGPoint(
+				x: lerp(start.x, end.x, progress),
+				y: lerp(start.y, end.y, progress)
+			)
+		}
 	}
 
-	private func drawParticles(context: inout GraphicsContext, particles: [OrbParticle]) {
-		let baseColor = isActive
-			? Color(red: 0.35, green: 0.95, blue: 1.0)
-			: Color(red: 0.65, green: 0.9, blue: 1.0)
+	private func transformPoint(
+		base: CGPoint,
+		depth: Double,
+		rotation: Double,
+		tilt: Double
+	) -> TransformedPoint {
+		let x = Double(base.x)
+		let y = Double(base.y)
+		let z = depth
+
+		let rotatedX = x * cos(rotation) + z * sin(rotation)
+		let rotatedZ = -x * sin(rotation) + z * cos(rotation)
+
+		let tiltedY = y * cos(tilt) - rotatedZ * sin(tilt)
+		let depthZ = y * sin(tilt) + rotatedZ * cos(tilt)
+		let face = clamp(CGFloat(0.5 + depthZ * 2.2), min: 0.0, max: 1.0)
+
+		let rawPerspective = 1.0 / (1.0 + depthZ * 1.35)
+		let perspective = min(1.0, max(0.84, rawPerspective))
+
+		return TransformedPoint(
+			point: CGPoint(x: rotatedX * perspective, y: tiltedY * perspective),
+			perspective: CGFloat(perspective),
+			depth: CGFloat(depthZ),
+			weight: 1.0,
+			face: face
+		)
+	}
+
+	private func drawGlow(
+		context: inout GraphicsContext,
+		particles: [LetterParticle],
+		palette: LetterPalette
+	) {
+		context.drawLayer { layer in
+			layer.addFilter(.blur(radius: 1.2))
+			for particle in particles where particle.alpha > 0.7 {
+				let size = particle.size * (isActive ? 2.0 : 1.8)
+				let rect = CGRect(
+					x: particle.position.x - size / 2,
+					y: particle.position.y - size / 2,
+					width: size,
+					height: size
+				)
+				let color = particle.usesAccent ? palette.accent : palette.highlight
+				layer.fill(
+					Path(ellipseIn: rect),
+					with: .color(color.opacity(0.16 * particle.alpha))
+				)
+			}
+		}
+	}
+
+	private func drawParticles(
+		context: inout GraphicsContext,
+		particles: [LetterParticle],
+		palette: LetterPalette
+	) {
 		for particle in particles {
-			let alpha = (isActive ? 0.85 : 0.6) * particle.intensity
 			let rect = CGRect(
 				x: particle.position.x - particle.size / 2,
 				y: particle.position.y - particle.size / 2,
 				width: particle.size,
 				height: particle.size
 			)
-			context.fill(Path(ellipseIn: rect), with: .color(baseColor.opacity(alpha)))
+			let color = particle.usesAccent ? palette.accent : palette.core
+			context.fill(
+				Path(ellipseIn: rect),
+				with: .color(color.opacity(particle.alpha))
+			)
 		}
 	}
 
-	private func drawSparks(context: inout GraphicsContext, particles: [OrbParticle]) {
-		let threshold: CGFloat = isActive ? 3.8 : 3.0
-		let sparkColor = Color(red: 0.35, green: 0.8, blue: 1.0)
-		for i in 0..<particles.count {
-			for j in (i + 1)..<particles.count {
-				let a = particles[i].position
-				let b = particles[j].position
-				let dx = a.x - b.x
-				let dy = a.y - b.y
-				let distance = sqrt(dx * dx + dy * dy)
-				if distance >= threshold {
-					continue
-				}
-				let intensity = max(0.0, (threshold - distance) / threshold)
-				let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
-				let sparkCount = isActive ? 4 : 3
-				let baseAngle = Double(i * 17 + j * 11) * 0.3
-				for index in 0..<sparkCount {
-					let angle = baseAngle + Double(index) * Double.pi * 2 / Double(sparkCount)
-					let length = (isActive ? 4.2 : 3.0) * Double(intensity)
-					let end = CGPoint(
-						x: mid.x + CGFloat(cos(angle) * length),
-						y: mid.y + CGFloat(sin(angle) * length)
-					)
-					var path = Path()
-					path.move(to: mid)
-					path.addLine(to: end)
-					context.stroke(
-						path,
-						with: .color(sparkColor.opacity(0.9 * intensity)),
-						lineWidth: 0.8
-					)
-				}
-				let glowRect = CGRect(x: mid.x - 1.5, y: mid.y - 1.5, width: 3, height: 3)
-				context.fill(Path(ellipseIn: glowRect), with: .color(sparkColor.opacity(0.6 * intensity)))
-			}
-		}
+	private func smoothstep(_ value: Double) -> Double {
+		let t = min(max(value, 0.0), 1.0)
+		return t * t * (3.0 - 2.0 * t)
+	}
+
+	private func lerp(_ start: CGFloat, _ end: CGFloat, _ t: Double) -> CGFloat {
+		start + (end - start) * CGFloat(t)
+	}
+
+	private func clamp(_ value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
+		Swift.min(Swift.max(value, min), max)
+	}
+
+	private func rand(_ value: Double) -> Double {
+		fract(sin(value) * 43758.5453)
 	}
 
 	private func fract(_ value: Double) -> Double {
@@ -112,8 +225,262 @@ private struct CollisionOrbView: View {
 	}
 }
 
-private struct OrbParticle {
+private enum LetterCache {
+	static let sequence: [Character] = ["I", "N", "K", "F", "L", "O", "W"]
+	static let pointCount = 220
+	static let points: [[CGPoint]] = sequence.map { LetterSampler.points(for: $0, count: pointCount) }
+}
+
+private enum LetterSampler {
+	private static let font: CTFont = {
+		let candidates = ["SFMono-Bold", "Menlo-Bold", "Courier-Bold", ".SFNSDisplay"]
+		for name in candidates {
+			let font = CTFontCreateWithName(name as CFString, 1.0, nil)
+			if name == ".SFNSDisplay" {
+				return font
+			}
+			let postScript = CTFontCopyPostScriptName(font) as String
+			if postScript == name {
+				return font
+			}
+		}
+		return CTFontCreateWithName(".SFNSDisplay" as CFString, 1.0, nil)
+	}()
+
+	static func points(for character: Character, count: Int) -> [CGPoint] {
+		guard let path = path(for: character) else {
+			return []
+		}
+		let normalized = normalize(path: path)
+		let bounds = normalized.boundingBoxOfPath
+		let isK = character == "K"
+		let outlineStep: CGFloat = isK ? 0.02 : 0.025
+		let fillStep: CGFloat = isK ? 0.085 : 0.05
+		let outline = outlinePoints(path: normalized, step: outlineStep)
+		let fill = fillPoints(path: normalized, bounds: bounds, step: fillStep)
+		let pool = sortPoints(points: outline + fill)
+		return resample(points: pool, count: count)
+	}
+
+	private static func path(for character: Character) -> CGPath? {
+		let scalars = Array(String(character).utf16)
+		guard let uni = scalars.first else {
+			return nil
+		}
+		var glyph = CGGlyph()
+		var char = uni
+		guard CTFontGetGlyphsForCharacters(font, &char, &glyph, 1) else {
+			return nil
+		}
+		return CTFontCreatePathForGlyph(font, glyph, nil)
+	}
+
+	private static func normalize(path: CGPath) -> CGPath {
+		let bounds = path.boundingBoxOfPath
+		let scale = 1.0 / max(bounds.width, bounds.height)
+		var transform = CGAffineTransform.identity
+		transform = transform.translatedBy(x: -bounds.midX, y: -bounds.midY)
+		transform = transform.scaledBy(x: scale, y: -scale)
+		return path.copy(using: &transform) ?? path
+	}
+
+	private static func sortPoints(points: [CGPoint]) -> [CGPoint] {
+		points.sorted { a, b in
+			let angleA = atan2(a.y, a.x)
+			let angleB = atan2(b.y, b.x)
+			if angleA == angleB {
+				let radiusA = a.x * a.x + a.y * a.y
+				let radiusB = b.x * b.x + b.y * b.y
+				return radiusA < radiusB
+			}
+			return angleA < angleB
+		}
+	}
+
+	private static func outlinePoints(path: CGPath, step: CGFloat) -> [CGPoint] {
+		var segments: [LineSegment] = []
+		var current = CGPoint.zero
+		var start = CGPoint.zero
+
+		path.applyWithBlock { elementPointer in
+			let element = elementPointer.pointee
+			switch element.type {
+			case .moveToPoint:
+				current = element.points[0]
+				start = current
+			case .addLineToPoint:
+				let next = element.points[0]
+				segments.append(LineSegment(start: current, end: next))
+				current = next
+			case .addQuadCurveToPoint:
+				let control = element.points[0]
+				let end = element.points[1]
+				segments.append(contentsOf: approximateQuad(from: current, control: control, to: end))
+				current = end
+			case .addCurveToPoint:
+				let control1 = element.points[0]
+				let control2 = element.points[1]
+				let end = element.points[2]
+				segments.append(contentsOf: approximateCurve(from: current, control1: control1, control2: control2, to: end))
+				current = end
+			case .closeSubpath:
+				segments.append(LineSegment(start: current, end: start))
+				current = start
+			@unknown default:
+				break
+			}
+		}
+
+		var points: [CGPoint] = []
+		for segment in segments {
+			let length = segment.length
+			let steps = max(2, Int(length / step))
+			for index in 0...steps {
+				let t = CGFloat(index) / CGFloat(steps)
+				points.append(segment.interpolate(t))
+			}
+		}
+		return points
+	}
+
+	private static func approximateQuad(from start: CGPoint, control: CGPoint, to end: CGPoint) -> [LineSegment] {
+		var segments: [LineSegment] = []
+		let steps = 12
+		var previous = start
+		for index in 1...steps {
+			let t = CGFloat(index) / CGFloat(steps)
+			let point = quadBezier(start: start, control: control, end: end, t: t)
+			segments.append(LineSegment(start: previous, end: point))
+			previous = point
+		}
+		return segments
+	}
+
+	private static func approximateCurve(
+		from start: CGPoint,
+		control1: CGPoint,
+		control2: CGPoint,
+		to end: CGPoint
+	) -> [LineSegment] {
+		var segments: [LineSegment] = []
+		let steps = 16
+		var previous = start
+		for index in 1...steps {
+			let t = CGFloat(index) / CGFloat(steps)
+			let point = cubicBezier(start: start, control1: control1, control2: control2, end: end, t: t)
+			segments.append(LineSegment(start: previous, end: point))
+			previous = point
+		}
+		return segments
+	}
+
+	private static func quadBezier(start: CGPoint, control: CGPoint, end: CGPoint, t: CGFloat) -> CGPoint {
+		let mt = 1.0 - t
+		let x = mt * mt * start.x + 2.0 * mt * t * control.x + t * t * end.x
+		let y = mt * mt * start.y + 2.0 * mt * t * control.y + t * t * end.y
+		return CGPoint(x: x, y: y)
+	}
+
+	private static func cubicBezier(
+		start: CGPoint,
+		control1: CGPoint,
+		control2: CGPoint,
+		end: CGPoint,
+		t: CGFloat
+	) -> CGPoint {
+		let mt = 1.0 - t
+		let x = mt * mt * mt * start.x
+			+ 3.0 * mt * mt * t * control1.x
+			+ 3.0 * mt * t * t * control2.x
+			+ t * t * t * end.x
+		let y = mt * mt * mt * start.y
+			+ 3.0 * mt * mt * t * control1.y
+			+ 3.0 * mt * t * t * control2.y
+			+ t * t * t * end.y
+		return CGPoint(x: x, y: y)
+	}
+
+	private static func fillPoints(path: CGPath, bounds: CGRect, step: CGFloat) -> [CGPoint] {
+		var points: [CGPoint] = []
+		var y = bounds.minY
+		while y <= bounds.maxY {
+			var x = bounds.minX
+			while x <= bounds.maxX {
+				let point = CGPoint(x: x, y: y)
+				if path.contains(point, using: .winding, transform: .identity) {
+					points.append(point)
+				}
+				x += step
+			}
+			y += step
+		}
+		return points
+	}
+
+	private static func resample(points: [CGPoint], count: Int) -> [CGPoint] {
+		guard !points.isEmpty, count > 0 else {
+			return []
+		}
+		if points.count >= count {
+			let step = Double(points.count - 1) / Double(count - 1)
+			return (0..<count).map { index in
+				let sampleIndex = Int(Double(index) * step)
+				return points[min(sampleIndex, points.count - 1)]
+			}
+		}
+		return (0..<count).map { index in
+			points[index % points.count]
+		}
+	}
+}
+
+private struct LineSegment {
+	let start: CGPoint
+	let end: CGPoint
+
+	var length: CGFloat {
+		let dx = end.x - start.x
+		let dy = end.y - start.y
+		return sqrt(dx * dx + dy * dy)
+	}
+
+	func interpolate(_ t: CGFloat) -> CGPoint {
+		CGPoint(
+			x: start.x + (end.x - start.x) * t,
+			y: start.y + (end.y - start.y) * t
+		)
+	}
+}
+
+private struct LetterPalette {
+	let core: Color
+	let accent: Color
+	let highlight: Color
+
+	init(isActive: Bool) {
+		if isActive {
+			core = Color(red: 0.96, green: 0.34, blue: 0.4)
+			accent = Color(red: 1.0, green: 0.6, blue: 0.66)
+			highlight = Color(red: 1.0, green: 0.7, blue: 0.74)
+		} else {
+			core = Color(red: 0.26, green: 0.64, blue: 0.92)
+			accent = Color(red: 0.52, green: 0.86, blue: 0.98)
+			highlight = Color(red: 0.6, green: 0.9, blue: 0.98)
+		}
+	}
+}
+
+private struct LetterParticle {
 	let position: CGPoint
 	let size: CGFloat
-	let intensity: CGFloat
+	let alpha: CGFloat
+	let usesAccent: Bool
+}
+
+private struct TransformedPoint {
+	let point: CGPoint
+	let perspective: CGFloat
+	let depth: CGFloat
+	let weight: CGFloat
+	let face: CGFloat
 }
