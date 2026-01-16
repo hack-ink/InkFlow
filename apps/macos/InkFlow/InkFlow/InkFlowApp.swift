@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		let panel = FloatingPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 680, height: 420),
+			contentRect: NSRect(x: 0, y: 0, width: 720, height: 72),
 			styleMask: [.borderless],
 			backing: .buffered,
 			defer: false
