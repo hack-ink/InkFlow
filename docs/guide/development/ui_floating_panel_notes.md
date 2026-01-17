@@ -8,7 +8,7 @@ Purpose: Capture UI decisions and deferred enhancements for the macOS floating p
 - The panel uses player-style controls with play and stop icons, plus a secondary clear action.
 - A waveform module renders bar-style input levels while listening.
 - No settings panel is exposed yet.
-- The activation control uses a particle-collision core with blue spark bursts inside the orb.
+- The activation control uses a 3D particle letter morph that rotates continuously; transitions take half a rotation and finish exactly when the letter faces forward. It uses red (listening) and blue (idle) palettes.
 
 ## Deferred enhancements
 
