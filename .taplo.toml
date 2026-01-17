@@ -1,4 +1,5 @@
 exclude = [
+	".worktree",
 	"Makefile.toml",
 ]
 

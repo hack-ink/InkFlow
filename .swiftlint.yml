@@ -1,0 +1,8 @@
+included:
+  - apps/macos/InkFlow/InkFlow
+
+excluded:
+  - third_party
+  - target
+
+line_length: 120

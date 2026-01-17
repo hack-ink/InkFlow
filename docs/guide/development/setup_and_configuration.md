@@ -107,8 +107,8 @@ allow microphone access when Hardened Runtime is enabled.
 
 ## Cargo Make (Repository Rules)
 
-Use these tasks for Rust formatting and validation:
+Use these tasks for formatting and validation:
 
 - `cargo make fmt`
-- `cargo make clippy`
+- `cargo make lint`
 - `cargo make nextest`

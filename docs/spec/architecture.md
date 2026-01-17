@@ -70,7 +70,7 @@ Scope: Platform targets, frameworks, speech-to-text architecture, session model,
 ├── models/                          # ASR models (downloaded by setup).
 ├── scripts/                         # Setup and build helpers.
 ├── third_party/                     # Upstream and build outputs for sherpa-onnx.
-└── Makefile.toml                    # Use `cargo make fmt/clippy/nextest`.
+└── Makefile.toml                    # Use `cargo make fmt`, `cargo make lint`, and `cargo make nextest`.
 ```
 
 ## Key boundaries

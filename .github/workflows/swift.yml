@@ -1,0 +1,32 @@
+name: Swift
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  swift-checks:
+    name: SwiftLint and swift-format
+    runs-on: macos-latest
+    steps:
+      - name: Fetch latest code
+        uses: actions/checkout@v6
+
+      - name: SwiftLint
+        uses: norio-nomura/action-swiftlint@v3
+        with:
+          args: --config .swiftlint.yml --path apps/macos/InkFlow/InkFlow
+
+      - name: swift-format lint
+        run: |
+          swift format lint --recursive --configuration .swift-format apps/macos/InkFlow/InkFlow

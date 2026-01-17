@@ -24,11 +24,51 @@ args = [
 
 [tasks.fmt]
 workspace = false
+dependencies = [
+	"fmt-rust",
+	"fmt-swift",
+	"fmt-taplo",
+]
+
+[tasks.fmt-rust]
+workspace = false
 command = "cargo"
 toolchain = "nightly"
 args = [
 	"fmt",
 	"--all",
+]
+
+[tasks.fmt-swift]
+workspace = false
+command = "swift"
+args = [
+	"format",
+	"--recursive",
+	"--in-place",
+	"--configuration",
+	".swift-format",
+	"apps/macos/InkFlow/InkFlow",
+]
+
+[tasks.fmt-taplo]
+workspace = false
+command = "taplo"
+args = ["fmt"]
+
+[tasks.lint]
+workspace = false
+dependencies = ["clippy", "lint-swift"]
+
+[tasks.lint-swift]
+workspace = false
+command = "swiftlint"
+args = [
+	"lint",
+	"--config",
+	".swiftlint.yml",
+	"--path",
+	"apps/macos/InkFlow/InkFlow",
 ]
 
 [tasks.nextest]
