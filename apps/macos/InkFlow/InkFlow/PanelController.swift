@@ -21,6 +21,10 @@ final class PanelController: ObservableObject {
 		expandedHeight
 	}
 
+	var collapsedPanelHeight: CGFloat {
+		collapsedHeight
+	}
+
 	func toggleSettings() {
 		if !isExpanded {
 			setExpanded(true, animated: true)
@@ -82,20 +86,28 @@ final class PanelController: ObservableObject {
 		guard let panel else {
 			return
 		}
-		var frame = panel.frame
-		let delta = height - frame.height
+		let currentFrame = panel.frame
+		let topEdge = currentFrame.maxY
+		var frame = currentFrame
 		frame.size.height = height
 		frame.size.width = panelWidth
-		frame.origin.y -= delta
-		frame = panel.backingAlignedRect(frame, options: .alignAllEdgesNearest)
+		frame.origin.y = topEdge - height
 		let targetCornerRadius = isExpanded ? expandedCornerRadius : max(0, height / 2)
 		if animated {
 			NSAnimationContext.runAnimationGroup { context in
 				context.duration = animationDuration
 				context.timingFunction = timingFunction
 				panel.animator().setFrame(frame, display: true)
+			} completionHandler: { [weak self] in
+				guard let self else {
+					return
+				}
+				let alignedFrame = panel.backingAlignedRect(panel.frame, options: .alignAllEdgesNearest)
+				panel.setFrame(alignedFrame, display: true)
+				self.updatePanelCornerRadius(targetCornerRadius, animated: false)
 			}
 		} else {
+			frame = panel.backingAlignedRect(frame, options: .alignAllEdgesNearest)
 			panel.setFrame(frame, display: true)
 		}
 		updatePanelCornerRadius(targetCornerRadius, animated: animated)
@@ -116,7 +128,14 @@ final class PanelController: ObservableObject {
 			layer.contentsScale = scale
 			layer.allowsEdgeAntialiasing = true
 			let boundsRadius = min(layer.bounds.width, layer.bounds.height) / 2
-			let resolvedRadius = useBoundsRadius ? boundsRadius : cornerRadius
+			let resolvedRadius: CGFloat
+			if animated {
+				resolvedRadius = cornerRadius
+			} else if useBoundsRadius {
+				resolvedRadius = boundsRadius
+			} else {
+				resolvedRadius = cornerRadius
+			}
 			let alignedRadius = (resolvedRadius * scale).rounded(.toNearestOrAwayFromZero) / scale
 			if animated {
 				let animation = CABasicAnimation(keyPath: "cornerRadius")
@@ -130,7 +149,11 @@ final class PanelController: ObservableObject {
 			layer.cornerCurve = .circular
 			layer.masksToBounds = true
 			if applyMask {
-				self.applyMaskImage(to: layer, cornerRadius: alignedRadius, scale: scale)
+				if animated {
+					layer.mask = nil
+				} else {
+					self.applyMaskImage(to: layer, cornerRadius: alignedRadius, scale: scale)
+				}
 			} else {
 				layer.mask = nil
 			}

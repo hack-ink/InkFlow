@@ -36,9 +36,9 @@ struct PanelBackgroundView: View {
 				glassIntensity: AppearanceStyle.glassIntensity(from: glassIntensityRaw),
 				isTranslucent: isWindowTranslucent
 			)
-			let isExpanded = panelController.isExpanded
-			let collapsedRadius = max(0, proxy.size.height / 2)
-			let cornerRadius = isExpanded ? expandedCornerRadius : collapsedRadius
+			let collapsedRadius = max(0, panelController.collapsedPanelHeight / 2)
+			let cornerRadius = panelController.isExpanded ? expandedCornerRadius : collapsedRadius
+			let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 			Group {
 				if #available(macOS 26.0, *), appearance.isTranslucent {
 					GlassEffectContainer(spacing: 8) {
@@ -47,25 +47,14 @@ struct PanelBackgroundView: View {
 							.glassEffect(.regular.tint(appearance.surfaceTint), in: .rect(cornerRadius: cornerRadius))
 					}
 				} else if appearance.isTranslucent {
-					shapeFill(isExpanded: isExpanded, fill: .ultraThinMaterial)
+					shape.fill(.ultraThinMaterial)
 				} else {
-					shapeFill(isExpanded: isExpanded, fill: Color(nsColor: .windowBackgroundColor))
+					shape.fill(Color(nsColor: .windowBackgroundColor))
 				}
 			}
 			.frame(maxWidth: .infinity, maxHeight: .infinity)
 			.allowsHitTesting(false)
-		}
-	}
-
-	private func shapeFill<F: ShapeStyle>(isExpanded: Bool, fill: F) -> some View {
-		Group {
-			if isExpanded {
-				RoundedRectangle(cornerRadius: expandedCornerRadius, style: .continuous)
-					.fill(fill)
-			} else {
-				Capsule()
-					.fill(fill)
-			}
+			.animation(.easeInOut(duration: 0.32), value: panelController.isExpanded)
 		}
 	}
 }
