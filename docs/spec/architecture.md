@@ -30,13 +30,27 @@ Scope: Platform targets, frameworks, speech-to-text architecture, session model,
 - Live refinement: Whisper sliding-window decoding in parallel during dictation.
 - Finalization: Whisper second-pass decoding per endpoint segment replaces provisional sherpa text.
 - Single Whisper context instance per process.
-- Canonical specification: `docs/spec/stt_dictation_pipeline.md`.
+- Canonical specification: `docs/spec/core/stt_dictation_pipeline.md`.
 
 ## Text injection (macOS)
 
 - Primary strategy: Set clipboard and synthesize Cmd+V in the previously focused app.
 - Fallback strategy: Per-character typing injection (requires accessibility permission).
 - Permissions UX: Detect failure and guide the user to enable Accessibility permissions.
+
+## Settings UI (macOS)
+
+- Entry points: the menubar status item menu includes Settings... (Command-,) and Quit (Command-Q).
+- The settings window uses a sidebar with three sections: Appearance, Microphone, Shortcuts.
+- Appearance settings apply immediately to the app UI.
+- The Microphone section supports input device selection and a non-recording input test with a live level meter.
+- The Shortcuts section is interactive UI only and does not persist or affect behavior in this version.
+
+## Floating panel (macOS)
+
+- The primary UI is a borderless NSPanel styled as a Spotlight-like floating surface.
+- The panel hides when it loses key focus and can be reopened from the menubar, dock, or shortcuts.
+- The panel is repositionable by dragging empty space, and the last position is restored on the next show.
 
 ## Repository layout (expected)
 

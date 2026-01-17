@@ -53,6 +53,20 @@ void inkflow_engine_unregister_callback(InkFlowHandle *handle);
 - The `utf8` string is valid only for the duration of the callback.
 - The SwiftUI app must dispatch UI updates onto the main thread.
 
+## Settings UI notes
+
+- The menubar status item menu includes Settings... (Command-,) and Quit (Command-Q).
+- The settings window uses three sections: Appearance, Microphone, Shortcuts.
+- Appearance changes are UI-only and do not modify the engine in this version.
+- The Microphone test validates capture and updates a UI level meter without recording.
+- Shortcuts are interactive UI only and have no persistence or command bindings in this version.
+
+## Floating panel behavior
+
+- The primary UI surface is a borderless NSPanel that floats above other apps.
+- The panel hides on loss of key focus and is reopened from the menubar, dock, or shortcuts.
+- Users can reposition the panel by dragging empty space; the last position is restored on next show.
+
 ### Update payload format (JSON)
 
 The callback delivers JSON strings. Each payload has a `kind` and optional fields.

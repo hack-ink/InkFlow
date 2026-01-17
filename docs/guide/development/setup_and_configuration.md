@@ -6,7 +6,7 @@ This document captures the SwiftUI + Rust FFI configuration used by InkFlow.
 
 Key build settings:
 
-- Bundle identifier: `ink.hack.inkflow`.
+- Bundle identifier: `ink.hack.InkFlow`.
 - Bridging header: `InkFlow/InkFlowBridge.h`.
 - Header search path: `$(SRCROOT)/../../../crates/inkflow-ffi/include`.
 - Run Script phase: build `inkflow-ffi`, copy `libinkflow_ffi.dylib`, stage sherpa-onnx and ONNX Runtime dylibs, and link `models/` into app resources for development.
@@ -85,7 +85,7 @@ fi
 
 Configure the microphone usage string via the Xcode build setting:
 
-- `INFOPLIST_KEY_NSMicrophoneUsageDescription = "InkFlow needs microphone access to transcribe your speech into text."`
+- `INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ink Flow needs microphone access to transcribe your speech into text."`
 
 ## Code Signing Entitlements
 

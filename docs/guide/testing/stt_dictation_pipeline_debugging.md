@@ -3,7 +3,7 @@
 Date: 2026-01-16
 
 This document describes the current debugging workflow for the SwiftUI + Rust FFI stack.
-The pipeline specification remains in `docs/spec/stt_dictation_pipeline.md`.
+The pipeline specification remains in `docs/spec/core/stt_dictation_pipeline.md`.
 
 ## 1. Run the macOS App Under Xcode
 

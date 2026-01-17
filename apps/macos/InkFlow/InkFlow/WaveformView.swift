@@ -34,8 +34,8 @@ private struct WaveformBars: View {
 			let spacing: CGFloat = 3
 			let totalSpacing = spacing * CGFloat(max(barCount - 1, 0))
 			let barWidth = max((proxy.size.width - totalSpacing) / CGFloat(barCount), 2)
-			let topColor = Color.white.opacity(isActive ? 0.9 : 0.35)
-			let bottomColor = Color.white.opacity(isActive ? 0.45 : 0.18)
+			let topColor = Color.primary.opacity(isActive ? 0.9 : 0.35)
+			let bottomColor = Color.primary.opacity(isActive ? 0.45 : 0.18)
 			let gradient = LinearGradient(colors: [topColor, bottomColor], startPoint: .top, endPoint: .bottom)
 
 			HStack(alignment: .center, spacing: spacing) {

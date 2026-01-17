@@ -4,11 +4,19 @@ Purpose: Capture UI decisions and deferred enhancements for the macOS floating p
 
 ## Current behavior
 
+- The panel is a Spotlight-style floating surface that can be repositioned by dragging empty space.
+- The panel hides when it loses key focus and can be reopened from the menubar, dock, or shortcuts.
 - The transcript is presented as a single line with truncation.
-- The panel uses player-style controls with play and stop icons, plus a secondary clear action.
+- The header includes the activation orb, transcript text, and an expand control.
+- The expanded area hosts mode tabs and a settings overlay.
 - A waveform module renders bar-style input levels while listening.
-- No settings panel is exposed yet.
 - The activation control uses a 3D particle letter morph that rotates continuously; transitions take half a rotation and finish exactly when the letter faces forward. It uses red (listening) and blue (idle) palettes.
+
+## Implementation lessons
+
+- Prefer system window dragging (`isMovableByWindowBackground`) over custom hit testing.
+- Avoid overriding `NSHostingView` hit testing for drag behavior. It causes SwiftUI controls to stop receiving clicks.
+- Keep the drag behavior in AppKit and keep SwiftUI views focused on interaction and visuals.
 
 ## Deferred enhancements
 

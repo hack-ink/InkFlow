@@ -3,7 +3,7 @@
 Date: 2026-01-16
 
 This document tracks the current SwiftUI + Rust FFI implementation of the dictation pipeline.
-The canonical behavior specification lives in `docs/spec/stt_dictation_pipeline.md`.
+The canonical behavior specification lives in `docs/spec/core/stt_dictation_pipeline.md`.
 
 ## Current Implementation Locations
 

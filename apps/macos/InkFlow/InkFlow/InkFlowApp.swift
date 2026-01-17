@@ -16,15 +16,27 @@ struct InkFlowApp: App {
 		Settings {
 			EmptyView()
 		}
+		.commands {
+			CommandGroup(replacing: .appSettings) {
+				Button("Settings...") {
+					appDelegate.toggleSettings()
+				}
+				.keyboardShortcut(",", modifiers: .command)
+			}
+		}
 	}
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var panel: FloatingPanel?
+	private var statusItem: NSStatusItem?
+	private let panelController = PanelController()
+	private let viewModel = InkFlowViewModel()
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
+		configureStatusItem()
 		let panel = FloatingPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 720, height: 72),
+			contentRect: NSRect(x: 0, y: 0, width: 720, height: 60),
 			styleMask: [.borderless],
 			backing: .buffered,
 			defer: false
@@ -34,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.isOpaque = false
 		panel.backgroundColor = .clear
 		panel.hasShadow = true
+		panel.ignoresMouseEvents = false
 		panel.isMovableByWindowBackground = true
 		panel.hidesOnDeactivate = false
 		panel.isReleasedWhenClosed = false
@@ -41,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.titlebarAppearsTransparent = true
 		panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-		let hostingController = NSHostingController(rootView: ContentView())
+		let hostingController = PanelHostViewController(panelController: panelController, viewModel: viewModel)
 		hostingController.view.wantsLayer = true
 		hostingController.view.layer?.cornerRadius = cornerRadius
 		hostingController.view.layer?.cornerCurve = .circular
@@ -54,14 +67,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			frameView.layer?.masksToBounds = true
 		}
 		panel.invalidateShadow()
-		panel.center()
+		restorePanelPosition(panel)
 		panel.makeKeyAndOrderFront(nil)
 
 		self.panel = panel
+		panelController.panel = panel
+		NotificationCenter.default.addObserver(self, selector: #selector(panelDidResignKey(_:)), name: NSWindow.didResignKeyNotification, object: panel)
+		NotificationCenter.default.addObserver(self, selector: #selector(panelDidMove(_:)), name: NSWindow.didMoveNotification, object: panel)
+		panelController.syncPanelSize(animated: false)
 	}
 
 	func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
 		false
+	}
+
+	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+		panelController.showPanel()
+		return true
+	}
+
+	@objc func toggleSettings() {
+		panelController.showPanel()
+		panelController.toggleSettings()
+	}
+
+	@objc private func quitApp() {
+		NSApp.terminate(nil)
+	}
+
+	@objc private func panelDidResignKey(_ notification: Notification) {
+		guard let panel = notification.object as? NSPanel else {
+			return
+		}
+		panel.orderOut(nil)
+		panelController.setExpanded(false, animated: false)
+		panelController.closeSettings()
+	}
+
+	@objc private func panelDidMove(_ notification: Notification) {
+		guard let panel = notification.object as? NSPanel else {
+			return
+		}
+		storePanelPosition(panel)
+	}
+
+	private func configureStatusItem() {
+		let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+		if let button = item.button {
+			let image = statusItemImage()
+			image.isTemplate = true
+			button.image = image
+		}
+
+		let menu = NSMenu()
+		let settingsItem = NSMenuItem(title: "Settings...", action: #selector(toggleSettings), keyEquivalent: ",")
+		settingsItem.keyEquivalentModifierMask = [.command]
+		settingsItem.target = self
+		menu.addItem(settingsItem)
+
+		let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+		quitItem.keyEquivalentModifierMask = [.command]
+		quitItem.target = self
+		menu.addItem(quitItem)
+
+		item.menu = menu
+		statusItem = item
+	}
+
+	private func statusItemImage() -> NSImage {
+		if let image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "InkFlow") {
+			return image
+		}
+		if let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "InkFlow") {
+			return image
+		}
+		return NSImage()
+	}
+
+	private func restorePanelPosition(_ panel: NSPanel) {
+		let defaults = UserDefaults.standard
+		let xKey = "panel.origin.x"
+		let yKey = "panel.origin.y"
+		guard defaults.object(forKey: xKey) != nil,
+			let storedX = defaults.object(forKey: xKey) as? Double,
+			let storedY = defaults.object(forKey: yKey) as? Double else {
+			panel.center()
+			return
+		}
+		var frame = panel.frame
+		frame.origin = CGPoint(x: storedX, y: storedY)
+		panel.setFrame(frame, display: false)
+	}
+
+	private func storePanelPosition(_ panel: NSPanel) {
+		let defaults = UserDefaults.standard
+		defaults.set(panel.frame.origin.x, forKey: "panel.origin.x")
+		defaults.set(panel.frame.origin.y, forKey: "panel.origin.y")
 	}
 }
 
