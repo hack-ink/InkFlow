@@ -21,35 +21,52 @@ enum PanelMode: String, CaseIterable, Identifiable {
 }
 
 struct PanelBackgroundView: View {
+	@ObservedObject var panelController: PanelController
 	@AppStorage("appearance.theme") private var themeRaw = ThemePreference.system.rawValue
 	@AppStorage("appearance.accent") private var accentRaw = AccentOption.sky.rawValue
 	@AppStorage("appearance.glassIntensity") private var glassIntensityRaw = GlassIntensity.standard.rawValue
 	@AppStorage("appearance.windowTranslucency") private var isWindowTranslucent = true
+	private let expandedCornerRadius: CGFloat = 12
 
 	var body: some View {
-		let appearance = AppearanceStyle(
-			theme: AppearanceStyle.theme(from: themeRaw),
-			accent: AppearanceStyle.accent(from: accentRaw),
-			glassIntensity: AppearanceStyle.glassIntensity(from: glassIntensityRaw),
-			isTranslucent: isWindowTranslucent
-		)
-
-		let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-		Group {
-			if #available(macOS 26.0, *), appearance.isTranslucent {
-				GlassEffectContainer(spacing: 8) {
-					Color.clear
-						.frame(maxWidth: .infinity, maxHeight: .infinity)
-						.glassEffect(.regular.tint(appearance.surfaceTint), in: .rect(cornerRadius: 12))
+		GeometryReader { proxy in
+			let appearance = AppearanceStyle(
+				theme: AppearanceStyle.theme(from: themeRaw),
+				accent: AppearanceStyle.accent(from: accentRaw),
+				glassIntensity: AppearanceStyle.glassIntensity(from: glassIntensityRaw),
+				isTranslucent: isWindowTranslucent
+			)
+			let isExpanded = panelController.isExpanded
+			let collapsedRadius = max(0, proxy.size.height / 2)
+			let cornerRadius = isExpanded ? expandedCornerRadius : collapsedRadius
+			Group {
+				if #available(macOS 26.0, *), appearance.isTranslucent {
+					GlassEffectContainer(spacing: 8) {
+						Color.clear
+							.frame(maxWidth: .infinity, maxHeight: .infinity)
+							.glassEffect(.regular.tint(appearance.surfaceTint), in: .rect(cornerRadius: cornerRadius))
+					}
+				} else if appearance.isTranslucent {
+					shapeFill(isExpanded: isExpanded, fill: .ultraThinMaterial)
+				} else {
+					shapeFill(isExpanded: isExpanded, fill: Color(nsColor: .windowBackgroundColor))
 				}
-			} else if appearance.isTranslucent {
-				shape.fill(.ultraThinMaterial)
+			}
+			.frame(maxWidth: .infinity, maxHeight: .infinity)
+			.allowsHitTesting(false)
+		}
+	}
+
+	private func shapeFill<F: ShapeStyle>(isExpanded: Bool, fill: F) -> some View {
+		Group {
+			if isExpanded {
+				RoundedRectangle(cornerRadius: expandedCornerRadius, style: .continuous)
+					.fill(fill)
 			} else {
-				shape.fill(Color(nsColor: .windowBackgroundColor))
+				Capsule()
+					.fill(fill)
 			}
 		}
-		.frame(maxWidth: .infinity, maxHeight: .infinity)
-		.allowsHitTesting(false)
 	}
 }
 
@@ -308,11 +325,12 @@ private struct ModeTab: View {
 	}
 }
 
+
 #Preview {
 	let panelController = PanelController()
 	let model = InkFlowViewModel()
 	ZStack {
-		PanelBackgroundView()
+		PanelBackgroundView(panelController: panelController)
 		VStack(spacing: 6) {
 			PanelHeaderView(model: model, panelController: panelController)
 			PanelExpandedView(panelController: panelController)

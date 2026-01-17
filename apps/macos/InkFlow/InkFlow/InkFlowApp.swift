@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			backing: .buffered,
 			defer: false
 		)
-		let cornerRadius: CGFloat = 24
+		let cornerRadius: CGFloat = panel.frame.height / 2
 		panel.level = .floating
 		panel.isOpaque = false
 		panel.backgroundColor = .clear
