@@ -140,6 +140,7 @@ impl WindowState {
 		self.total_16k_samples
 	}
 
+	#[cfg(test)]
 	pub(crate) fn ring_len(&self) -> usize {
 		self.window_ring.len()
 	}
