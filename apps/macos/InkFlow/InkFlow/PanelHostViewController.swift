@@ -11,6 +11,7 @@ final class PanelHostViewController: NSViewController {
 	private let headerHost: NSHostingView<PanelHeaderView>
 	private let expandedHost: NSHostingView<PanelExpandedView>
 
+	private var headerTopConstraint: NSLayoutConstraint?
 	private var expandedHeightConstraint: NSLayoutConstraint?
 
 	init(panelController: PanelController, viewModel: InkFlowViewModel) {
@@ -56,8 +57,13 @@ final class PanelHostViewController: NSViewController {
 			backgroundHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 		])
 
+		headerTopConstraint = headerHost.topAnchor.constraint(
+			equalTo: view.topAnchor,
+			constant: headerTopInset(forExpanded: panelController.isExpanded)
+		)
+
 		NSLayoutConstraint.activate([
-			headerHost.topAnchor.constraint(equalTo: view.topAnchor, constant: padding),
+			headerTopConstraint,
 			headerHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
 			headerHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
 			headerHost.heightAnchor.constraint(equalToConstant: headerHeight),
@@ -65,7 +71,7 @@ final class PanelHostViewController: NSViewController {
 			expandedHost.topAnchor.constraint(equalTo: headerHost.bottomAnchor, constant: spacing),
 			expandedHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
 			expandedHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding)
-		])
+		].compactMap { $0 })
 
 		expandedHeightConstraint = expandedHost.heightAnchor.constraint(equalToConstant: 0)
 		expandedHeightConstraint?.isActive = true
@@ -81,6 +87,7 @@ final class PanelHostViewController: NSViewController {
 	}
 
 	private func applyExpandedState(_ expanded: Bool) {
+		headerTopConstraint?.constant = headerTopInset(forExpanded: expanded)
 		expandedHost.isHidden = false
 		expandedHost.alphaValue = expanded ? 1.0 : 0.0
 		expandedHeightConstraint?.constant = expanded ? expandedContentHeight : 0
@@ -96,5 +103,14 @@ final class PanelHostViewController: NSViewController {
 		let headerHeight = UIPanelLayout.headerHeight
 		let targetHeight = panelController.expandedPanelHeight
 		return max(0, targetHeight - (padding * 2 + spacing + headerHeight))
+	}
+
+	private func headerTopInset(forExpanded expanded: Bool) -> CGFloat {
+		if expanded {
+			return UIPanelLayout.padding
+		}
+		let collapsedHeight = panelController.collapsedPanelHeight
+		let headerHeight = UIPanelLayout.headerHeight
+		return max(0, (collapsedHeight - headerHeight) / 2)
 	}
 }

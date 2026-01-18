@@ -7,6 +7,13 @@ struct ActivationOrbView: View {
 	var body: some View {
 		LetterMorphOrbView(isActive: isActive)
 			.frame(width: UISize.orbDiameter, height: UISize.orbDiameter)
+			.overlay {
+				if OrbDebug.showsFrame {
+					Rectangle()
+						.stroke(OrbDebug.frameColor, lineWidth: OrbDebug.frameLineWidth)
+						.allowsHitTesting(false)
+				}
+			}
 	}
 }
 
@@ -21,32 +28,26 @@ private struct LetterMorphOrbView: View {
 				let time = now - startTime
 				let center = CGPoint(x: size.width / 2, y: size.height / 2)
 				let palette = LetterPalette(isActive: isActive)
-				let rotationPeriod: TimeInterval = 6.0
-				let letterPeriod = rotationPeriod
-				let rotation = time * (Double.pi * 2.0 / rotationPeriod)
-				let tilt = 0.14
-				let scale = min(size.width, size.height) * 0.88
+				let letterPeriod = OrbMotion.rotationPeriod
+				let rotation = time * (Double.pi * 2.0 / OrbMotion.rotationPeriod)
+				let tilt = OrbMotion.tilt
+				let scale = min(size.width, size.height) * OrbMotion.scaleFactor
 
 				context.blendMode = .plusLighter
 
 				let points = letterPoints(at: time, letterPeriod: letterPeriod)
-				let layers: [(depth: Double, weight: CGFloat)] = [
-					(-0.12, 0.6),
-					(-0.06, 0.8),
-					(0.0, 1.0),
-					(0.06, 0.8),
-					(0.12, 0.6)
-				]
 				var transformedPoints: [TransformedPoint] = []
-				transformedPoints.reserveCapacity(points.count * layers.count)
+				transformedPoints.reserveCapacity(points.count * OrbMotion.layers.count)
 
 				for (index, point) in points.enumerated() {
 					let seed = Double(index) * 0.61803398875
-					let drift = sin(time * 0.8 + seed * 2.3) * 0.004
+					let drift = sin(time * OrbMotion.driftSpeed + seed * OrbMotion.driftPhase)
+						* OrbMotion.driftAmplitude
 					let base = CGPoint(x: point.x + drift, y: point.y - drift)
-					let baseDepth = Double(base.x) * 0.32
-					for (layerIndex, layer) in layers.enumerated() {
-						let jitter = (rand(seed * 6.7 + Double(layerIndex) * 1.9) - 0.5) * 0.04
+					let baseDepth = Double(base.x) * OrbMotion.depthScale
+					for (layerIndex, layer) in OrbMotion.layers.enumerated() {
+						let jitter = (rand(seed * OrbMotion.jitterSeedA + Double(layerIndex) * OrbMotion.jitterSeedB) - 0.5)
+							* OrbMotion.jitterAmplitude
 						let transformed = transformPoint(
 							base: base,
 							depth: baseDepth + layer.depth + jitter,
@@ -508,4 +509,34 @@ private struct TransformedPoint {
 	let depth: CGFloat
 	let weight: CGFloat
 	let face: CGFloat
+}
+
+private enum OrbMotion {
+	static let rotationPeriod: TimeInterval = 6.0
+	static let tilt: Double = 0.14
+	static let scaleFactor: CGFloat = 0.88
+	static let driftSpeed: Double = 0.8
+	static let driftPhase: Double = 2.3
+	static let driftAmplitude: Double = 0.004
+	static let depthScale: Double = 0.32
+	static let jitterSeedA: Double = 6.7
+	static let jitterSeedB: Double = 1.9
+	static let jitterAmplitude: Double = 0.04
+	static let layers: [(depth: Double, weight: CGFloat)] = [
+		(-0.12, 0.6),
+		(-0.06, 0.8),
+		(0.0, 1.0),
+		(0.06, 0.8),
+		(0.12, 0.6)
+	]
+}
+
+private enum OrbDebug {
+#if DEBUG
+	static let showsFrame = true
+#else
+	static let showsFrame = false
+#endif
+	static let frameLineWidth: CGFloat = 1
+	static let frameColor = Color.red.opacity(0.6)
 }
