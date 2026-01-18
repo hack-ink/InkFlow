@@ -129,6 +129,9 @@ private struct AppearanceSettingsView: View {
 	@AppStorage("appearance.accent") private var accentRaw = AccentOption.sky.rawValue
 	@AppStorage("appearance.glassIntensity") private var glassIntensityRaw = GlassIntensity.standard.rawValue
 	@AppStorage("appearance.windowTranslucency") private var isWindowTranslucent = true
+#if DEBUG
+	@AppStorage("debug.showOrbFrame") private var showOrbFrame = false
+#endif
 
 	var body: some View {
 		ScrollView {
@@ -181,6 +184,12 @@ private struct AppearanceSettingsView: View {
 						Toggle("Window translucency", isOn: $isWindowTranslucent)
 					}
 				}
+#if DEBUG
+				Divider()
+				SettingsGroup(title: "Debug") {
+					Toggle("Show orb frame", isOn: $showOrbFrame)
+				}
+#endif
 			}
 			.padding(.vertical, SettingsLayout.scrollVerticalPadding)
 		}

@@ -3,16 +3,21 @@ import SwiftUI
 
 struct ActivationOrbView: View {
 	let isActive: Bool
+#if DEBUG
+	@AppStorage("debug.showOrbFrame") private var showsOrbFrame = false
+#endif
 
 	var body: some View {
 		LetterMorphOrbView(isActive: isActive)
 			.frame(width: UISize.orbDiameter, height: UISize.orbDiameter)
 			.overlay {
-				if OrbDebug.showsFrame {
+#if DEBUG
+				if showsOrbFrame {
 					Rectangle()
 						.stroke(OrbDebug.frameColor, lineWidth: OrbDebug.frameLineWidth)
 						.allowsHitTesting(false)
 				}
+#endif
 			}
 	}
 }
@@ -66,35 +71,45 @@ private struct LetterMorphOrbView: View {
 					}
 				}
 
-				var average = CGPoint.zero
-				var totalWeight: CGFloat = 0.0
-				for point in transformedPoints {
-					average.x += point.point.x * point.weight
-					average.y += point.point.y * point.weight
-					totalWeight += point.weight
-				}
-				if totalWeight > 0.0 {
-					average.x /= totalWeight
-					average.y /= totalWeight
-				}
-
 				var particles: [LetterParticle] = []
 				particles.reserveCapacity(transformedPoints.count)
+				var bounds = CGRect.null
 				for transformed in transformedPoints {
 					let perspective = transformed.perspective
 					let position = CGPoint(
-						x: center.x + (transformed.point.x - average.x) * scale,
-						y: center.y + (transformed.point.y - average.y) * scale
+						x: center.x + transformed.point.x * scale,
+						y: center.y + transformed.point.y * scale
 					)
 					let face = (0.15 + 0.85 * transformed.face)
 					let size = (isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective) * (0.85 + 0.15 * face)
 					let light = clamp(0.7 + transformed.depth * 0.9, min: 0.45, max: 1.0)
 					let alpha = (isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light * face
 					let usesAccent = light > 0.84
+					let rect = CGRect(
+						x: position.x - size / 2,
+						y: position.y - size / 2,
+						width: size,
+						height: size
+					)
+					bounds = bounds.union(rect)
 
 					particles.append(
 						LetterParticle(position: position, size: size, alpha: alpha, usesAccent: usesAccent)
 					)
+				}
+				if !bounds.isNull {
+					let offsetX = center.x - bounds.midX
+					let offsetY = center.y - bounds.midY
+					if offsetX != 0 || offsetY != 0 {
+						particles = particles.map { particle in
+							LetterParticle(
+								position: CGPoint(x: particle.position.x + offsetX, y: particle.position.y + offsetY),
+								size: particle.size,
+								alpha: particle.alpha,
+								usesAccent: particle.usesAccent
+							)
+						}
+					}
 				}
 
 				particles.sort { $0.alpha < $1.alpha }
@@ -532,11 +547,6 @@ private enum OrbMotion {
 }
 
 private enum OrbDebug {
-#if DEBUG
-	static let showsFrame = true
-#else
-	static let showsFrame = false
-#endif
 	static let frameLineWidth: CGFloat = 1
 	static let frameColor = Color.red.opacity(0.6)
 }
