@@ -1,7 +1,12 @@
-# Rust Style Guide
+# Rust Development and Style Guide
 
-These rules apply only to Rust code in this repository.
+These rules apply to Rust code and Rust development workflows in this repository.
 All comments and messages must also follow the Global Language Rules in `AGENTS.md`.
+
+## Scope
+
+These rules apply to Rust crates, binaries, and tooling in this repository, typically within directories that include a `Cargo.toml`.
+Do not apply them to non-Rust projects.
 
 ## Rule Language and Precedence
 
@@ -11,6 +16,26 @@ All comments and messages must also follow the Global Language Rules in `AGENTS.
 - rustfmt output is always the final authority for formatting.
 
 ## Normative Rules
+
+### Tooling and Toolchain
+
+- Use the workspace `cargo make` tasks when they are the best fit for the job:
+  - `cargo make fmt`.
+  - `cargo make clippy`.
+  - `cargo make nextest`.
+  - `cargo make sqlx`.
+- You may use raw `cargo` commands when they are more appropriate for the specific task or when explicitly requested.
+- Do not set `DATABASE_URL` manually when running `cargo make` tasks.
+- The Rust toolchain is pinned.
+- Do not modify `rust-toolchain.toml`, `.cargo/config.toml`, or `rustfmt.toml`.
+- Do not install, update, or override toolchains.
+- Do not invoke system package managers.
+
+### Runtime Safety
+
+- Do not use `unwrap()` in non-test code.
+- `expect()` is allowed only in global or static initialization and one-time startup initialization where failure should terminate the process immediately with a clear message.
+- Never block inside async contexts.
 
 ### Indentation
 

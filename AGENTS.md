@@ -3,7 +3,7 @@
 These instructions define the **execution rules**, **scope limits**, **global language requirements**,
 and **hard prohibitions** for all automated agents operating in this repository.
 
-They override typical Rust conventions or local patterns when conflicting with any rule below.
+They override typical language conventions or local patterns when conflicting with any rule below.
 
 ---
 
@@ -59,28 +59,10 @@ If these rules conflict with higher-priority instructions (system, developer, or
 
 # 1. Execution Model
 
-## 1.1 cargo-make Preferred
+Language- or stack-specific execution rules live in `docs/guide/development/languages/`.
+Language- or stack-specific rules must be documented under `docs/guide/development/languages/` and linked from `docs/guide/index.md`.
 
-Use the workspace’s `cargo make` tasks when they are the best fit for the job. These tasks are convenience wrappers for common workflows:
-
-- `cargo make fmt`
-- `cargo make clippy`
-- `cargo make nextest`
-- `cargo make sqlx`
-
-You may use raw `cargo` commands when they are more appropriate for the specific task or when explicitly requested.
 Run verification commands only when requested or when you need evidence before claiming completion.
-Do not set `DATABASE_URL` manually when running `cargo make` tasks.
-
-## 1.2 Toolchain
-
-The Rust toolchain is pinned.
-
-Never:
-
-- Modify `rust-toolchain.toml`, `.cargo/config.toml`, or `rustfmt.toml`.
-- Install, update, or override toolchains.
-- Invoke system package managers.
 
 # 2. Scope & Change Control
 
@@ -146,7 +128,6 @@ Do not change existing behavior unless explicitly required.
 
 # 5. Logging & Error Handling
 
-- Never import tracing macros; always use fully-qualified calls (`tracing::info!`).
 - No silent failures; errors must be logged or propagated clearly.
 - Avoid broad catch patterns or swallowed errors.
 
@@ -158,7 +139,8 @@ Violating any of these invalidates the output:
 
 ## 6.1 Toolchain & System
 
-Never modify toolchain config or invoke system package managers.
+Do not modify toolchain config or invoke system package managers unless explicitly requested.
+Follow language-specific toolchain rules in `docs/guide/development/languages/`.
 
 ## 6.2 File Boundaries
 
@@ -177,9 +159,7 @@ Never modify:
 
 ## 6.4 Async & Runtime
 
-- No `unwrap()` in non-test code.
-- `expect()` is allowed only in global or static initialization and one-time startup initialization where failure should terminate the process immediately with a clear message.
-- Never block inside async (`thread::sleep`, blocking I/O).
+- Never block inside async contexts.
 
 ## 6.5 Behavioral
 
@@ -189,8 +169,8 @@ Never modify:
 
 ---
 
-# 7. Rust Style Rules Reference
+# 7. Language-Specific Rules Reference
 
-Rust formatting and style conventions live in `docs/guide/development/rust_style_guide.md`.
+Rust development and style rules live in `docs/guide/development/languages/rust.md`.
 These rules apply **only** when editing Rust code and do **not** override
 the global behavior and language rules in this file.
