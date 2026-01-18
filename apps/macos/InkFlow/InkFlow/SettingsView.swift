@@ -39,7 +39,7 @@ struct SettingsView: View {
 	}
 
 	var body: some View {
-		HStack(spacing: 16) {
+		HStack(spacing: SettingsLayout.rootSpacing) {
 			sidebar
 			Divider()
 			detailView
@@ -54,16 +54,16 @@ struct SettingsView: View {
 	}
 
 	private var sidebar: some View {
-		VStack(alignment: .leading, spacing: 6) {
+		VStack(alignment: .leading, spacing: SettingsLayout.sidebarSpacing) {
 			ForEach(SettingsSection.allCases) { section in
 				SidebarButton(title: section.title, isSelected: selectedSection == section) {
-					withAnimation(.easeInOut(duration: 0.18)) {
+					withAnimation(.easeInOut(duration: UIDuration.selectionChange)) {
 						selectedSectionRaw = section.rawValue
 					}
 				}
 			}
 		}
-		.frame(width: 150, alignment: .leading)
+		.frame(width: SettingsLayout.sidebarWidth, alignment: .leading)
 	}
 
 	@ViewBuilder
@@ -80,7 +80,7 @@ struct SettingsView: View {
 		}
 		.id(selectedSection)
 		.transition(.opacity)
-		.animation(.easeInOut(duration: 0.2), value: selectedSectionRaw)
+		.animation(.easeInOut(duration: UIDuration.standard), value: selectedSectionRaw)
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 	}
 }
@@ -97,14 +97,14 @@ private struct SidebarButton: View {
 				.font(.system(size: 12, weight: .medium))
 				.foregroundStyle(isSelected ? Color.primary : Color.secondary)
 				.frame(maxWidth: .infinity, alignment: .leading)
-				.padding(.vertical, 6)
-				.padding(.horizontal, 8)
+				.padding(.vertical, SettingsLayout.sidebarItemVerticalPadding)
+				.padding(.horizontal, SettingsLayout.sidebarItemHorizontalPadding)
 				.background(background)
-				.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+				.clipShape(RoundedRectangle(cornerRadius: UICornerRadius.small, style: .continuous))
 		}
 		.buttonStyle(.plain)
 		.onHover { hovering in
-			withAnimation(.easeInOut(duration: 0.15)) {
+			withAnimation(.easeInOut(duration: UIDuration.hoverFade)) {
 				isHovered = hovering
 			}
 		}
@@ -113,11 +113,11 @@ private struct SidebarButton: View {
 	@ViewBuilder
 	private var background: some View {
 		if isSelected {
-			RoundedRectangle(cornerRadius: 8, style: .continuous)
-				.fill(Color.primary.opacity(0.1))
+			RoundedRectangle(cornerRadius: UICornerRadius.small, style: .continuous)
+				.fill(UIColors.sidebarSelectedBackground)
 		} else if isHovered {
-			RoundedRectangle(cornerRadius: 8, style: .continuous)
-				.fill(Color.primary.opacity(0.05))
+			RoundedRectangle(cornerRadius: UICornerRadius.small, style: .continuous)
+				.fill(UIColors.sidebarHoverBackground)
 		} else {
 			Color.clear
 		}
@@ -132,7 +132,7 @@ private struct AppearanceSettingsView: View {
 
 	var body: some View {
 		ScrollView {
-			VStack(alignment: .leading, spacing: 16) {
+			VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
 				SettingsGroup(title: "Theme") {
 					Picker("Theme", selection: themeBinding) {
 						ForEach(ThemePreference.allCases) { option in
@@ -144,16 +144,22 @@ private struct AppearanceSettingsView: View {
 				}
 				Divider()
 				SettingsGroup(title: "Accent Color") {
-					LazyVGrid(columns: Array(repeating: GridItem(.fixed(26), spacing: 10), count: 6), spacing: 10) {
+					LazyVGrid(
+						columns: Array(
+							repeating: GridItem(.fixed(SettingsLayout.accentGridItemSize), spacing: SettingsLayout.accentGridSpacing),
+							count: SettingsLayout.accentGridColumns
+						),
+						spacing: SettingsLayout.accentGridSpacing
+					) {
 						ForEach(AccentOption.allCases) { option in
 							Button {
-								withAnimation(.easeInOut(duration: 0.18)) {
+								withAnimation(.easeInOut(duration: UIDuration.selectionChange)) {
 									accentRaw = option.rawValue
 								}
 							} label: {
 								Circle()
 									.fill(option.color)
-									.frame(width: 20, height: 20)
+									.frame(width: UISize.accentSwatch, height: UISize.accentSwatch)
 									.overlay(selectionRing(for: option))
 							}
 							.buttonStyle(.plain)
@@ -163,7 +169,7 @@ private struct AppearanceSettingsView: View {
 				}
 				Divider()
 				SettingsGroup(title: "Window and Glass") {
-					VStack(alignment: .leading, spacing: 10) {
+					VStack(alignment: .leading, spacing: SettingsLayout.groupSpacing) {
 						Picker("Glass intensity", selection: glassIntensityBinding) {
 							ForEach(GlassIntensity.allCases) { option in
 								Text(option.title)
@@ -176,7 +182,7 @@ private struct AppearanceSettingsView: View {
 					}
 				}
 			}
-			.padding(.vertical, 8)
+			.padding(.vertical, SettingsLayout.scrollVerticalPadding)
 		}
 	}
 
@@ -198,7 +204,7 @@ private struct AppearanceSettingsView: View {
 	private func selectionRing(for option: AccentOption) -> some View {
 		if AppearanceStyle.accent(from: accentRaw) == option {
 			Circle()
-				.strokeBorder(Color.primary.opacity(0.8), lineWidth: 2)
+				.strokeBorder(UIColors.selectionRing, lineWidth: SettingsLayout.selectionRingLineWidth)
 		}
 	}
 }
@@ -210,7 +216,7 @@ private struct MicrophoneSettingsView: View {
 
 	var body: some View {
 		ScrollView {
-			VStack(alignment: .leading, spacing: 16) {
+			VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
 				SettingsGroup(title: "Input Device") {
 					if devices.isEmpty {
 						Text("No input devices found.")
@@ -227,7 +233,7 @@ private struct MicrophoneSettingsView: View {
 				}
 				Divider()
 				SettingsGroup(title: "Input Level") {
-					VStack(alignment: .leading, spacing: 6) {
+					VStack(alignment: .leading, spacing: SettingsLayout.inlineSpacing) {
 						LevelMeterView(level: testModel.level, isActive: testModel.isTesting)
 						if testModel.isTesting {
 							Text("Listening...")
@@ -250,7 +256,7 @@ private struct MicrophoneSettingsView: View {
 					.controlSize(.small)
 				}
 			}
-			.padding(.vertical, 8)
+			.padding(.vertical, SettingsLayout.scrollVerticalPadding)
 		}
 		.onAppear {
 			devices = AudioInputDevice.available()
@@ -268,7 +274,7 @@ private struct ShortcutsSettingsView: View {
 
 	var body: some View {
 		ScrollView {
-			VStack(alignment: .leading, spacing: 16) {
+			VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
 				SettingsGroup(title: "Dictation") {
 					ShortcutRow(title: "Toggle dictation", value: $toggleDictation)
 					ShortcutRow(title: "Push-to-talk", value: $pushToTalk)
@@ -288,7 +294,7 @@ private struct ShortcutsSettingsView: View {
 					.controlSize(.small)
 				}
 			}
-			.padding(.vertical, 8)
+			.padding(.vertical, SettingsLayout.scrollVerticalPadding)
 		}
 	}
 }
@@ -303,7 +309,7 @@ private struct SettingsGroup<Content: View>: View {
 	}
 
 	var body: some View {
-		VStack(alignment: .leading, spacing: 10) {
+		VStack(alignment: .leading, spacing: SettingsLayout.groupSpacing) {
 			Text(title)
 				.font(.caption.weight(.semibold))
 				.foregroundStyle(.secondary)
@@ -320,14 +326,16 @@ private struct ShortcutRow: View {
 	var body: some View {
 		HStack {
 			Text(title)
-				.frame(width: 170, alignment: .leading)
+				.frame(width: SettingsLayout.shortcutLabelWidth, alignment: .leading)
 			TextField("", text: $value)
 				.textFieldStyle(.plain)
 				.font(.system(size: 13, weight: .medium, design: .monospaced))
-				.padding(.vertical, 5)
-				.padding(.horizontal, 8)
-				.background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-					.fill(Color.primary.opacity(0.06)))
+				.padding(.vertical, SettingsLayout.shortcutFieldVerticalPadding)
+				.padding(.horizontal, SettingsLayout.shortcutFieldHorizontalPadding)
+				.background(
+					RoundedRectangle(cornerRadius: UICornerRadius.small, style: .continuous)
+						.fill(UIColors.shortcutFieldBackground)
+				)
 		}
 	}
 }
@@ -344,16 +352,35 @@ private struct LevelMeterView: View {
 
 			ZStack(alignment: .leading) {
 				RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-					.fill(Color.primary.opacity(0.08))
+					.fill(UIColors.levelMeterTrack)
 				RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-					.fill(isActive ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.3))
+					.fill(isActive ? UIColors.levelMeterActiveFill : UIColors.levelMeterInactiveFill)
 					.frame(width: filled)
 			}
 		}
-		.frame(height: 10)
-		.animation(.easeOut(duration: 0.12), value: level)
-		.animation(.easeInOut(duration: 0.2), value: isActive)
+		.frame(height: UISize.levelMeterHeight)
+		.animation(.easeOut(duration: UIDuration.meterLevel), value: level)
+		.animation(.easeInOut(duration: UIDuration.standard), value: isActive)
 	}
+}
+
+private enum SettingsLayout {
+	static let rootSpacing: CGFloat = UISpacing.xLarge
+	static let sidebarSpacing: CGFloat = UISpacing.small
+	static let sidebarWidth: CGFloat = 150
+	static let sidebarItemVerticalPadding: CGFloat = UISpacing.small
+	static let sidebarItemHorizontalPadding: CGFloat = UISpacing.medium
+	static let sectionSpacing: CGFloat = UISpacing.xLarge
+	static let groupSpacing: CGFloat = 10
+	static let inlineSpacing: CGFloat = UISpacing.small
+	static let scrollVerticalPadding: CGFloat = UISpacing.medium
+	static let accentGridItemSize: CGFloat = 26
+	static let accentGridSpacing: CGFloat = 10
+	static let accentGridColumns: Int = 6
+	static let shortcutLabelWidth: CGFloat = 170
+	static let shortcutFieldVerticalPadding: CGFloat = 5
+	static let shortcutFieldHorizontalPadding: CGFloat = UISpacing.medium
+	static let selectionRingLineWidth: CGFloat = 2
 }
 
 private struct AudioInputDevice: Identifiable {

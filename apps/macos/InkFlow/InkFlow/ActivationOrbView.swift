@@ -6,7 +6,7 @@ struct ActivationOrbView: View {
 
 	var body: some View {
 		LetterMorphOrbView(isActive: isActive)
-			.frame(width: 38, height: 38)
+			.frame(width: UISize.orbDiameter, height: UISize.orbDiameter)
 	}
 }
 
@@ -113,8 +113,8 @@ private struct LetterMorphOrbView: View {
 		let rawProgress = max(0.0, (phase - morphStart) / morphDuration)
 		let progress = smoothstep(rawProgress)
 
-		let from = LetterCache.points[index]
-		let to = LetterCache.points[nextIndex]
+		let from = LetterCache.centeredPoints[index]
+		let to = LetterCache.centeredPoints[nextIndex]
 		if from.isEmpty {
 			return to
 		}
@@ -228,7 +228,17 @@ private struct LetterMorphOrbView: View {
 private enum LetterCache {
 	static let sequence: [Character] = ["I", "N", "K", "F", "L", "O", "W"]
 	static let pointCount = 220
-	static let points: [[CGPoint]] = sequence.map { LetterSampler.points(for: $0, count: pointCount) }
+	static let samples: [(points: [CGPoint], centroid: CGPoint)] = sequence.map {
+		LetterSampler.sample(for: $0, count: pointCount)
+	}
+	static let points: [[CGPoint]] = samples.map { $0.points }
+	// Center each glyph on its centroid to reduce per-letter drift.
+	static let centeredPoints: [[CGPoint]] = zip(points, centroids).map { glyphPoints, centroid in
+		glyphPoints.map { point in
+			CGPoint(x: point.x - centroid.x, y: point.y - centroid.y)
+		}
+	}
+	static let centroids: [CGPoint] = samples.map { $0.centroid }
 }
 
 private enum LetterSampler {
@@ -247,9 +257,9 @@ private enum LetterSampler {
 		return CTFontCreateWithName(".SFNSDisplay" as CFString, 1.0, nil)
 	}()
 
-	static func points(for character: Character, count: Int) -> [CGPoint] {
+	static func sample(for character: Character, count: Int) -> (points: [CGPoint], centroid: CGPoint) {
 		guard let path = path(for: character) else {
-			return []
+			return ([], .zero)
 		}
 		let normalized = normalize(path: path)
 		let bounds = normalized.boundingBoxOfPath
@@ -258,8 +268,9 @@ private enum LetterSampler {
 		let fillStep: CGFloat = isK ? 0.085 : 0.05
 		let outline = outlinePoints(path: normalized, step: outlineStep)
 		let fill = fillPoints(path: normalized, bounds: bounds, step: fillStep)
+		let centroid = centroid(for: fill.isEmpty ? outline : fill)
 		let pool = sortPoints(points: outline + fill)
-		return resample(points: pool, count: count)
+		return (resample(points: pool, count: count), centroid)
 	}
 
 	private static func path(for character: Character) -> CGPath? {
@@ -282,6 +293,20 @@ private enum LetterSampler {
 		transform = transform.translatedBy(x: -bounds.midX, y: -bounds.midY)
 		transform = transform.scaledBy(x: scale, y: -scale)
 		return path.copy(using: &transform) ?? path
+	}
+
+	private static func centroid(for points: [CGPoint]) -> CGPoint {
+		guard !points.isEmpty else {
+			return .zero
+		}
+		var sumX: CGFloat = 0
+		var sumY: CGFloat = 0
+		for point in points {
+			sumX += point.x
+			sumY += point.y
+		}
+		let count = CGFloat(points.count)
+		return CGPoint(x: sumX / count, y: sumY / count)
 	}
 
 	private static func sortPoints(points: [CGPoint]) -> [CGPoint] {
@@ -459,13 +484,13 @@ private struct LetterPalette {
 
 	init(isActive: Bool) {
 		if isActive {
-			core = Color(red: 0.96, green: 0.34, blue: 0.4)
-			accent = Color(red: 1.0, green: 0.6, blue: 0.66)
-			highlight = Color(red: 1.0, green: 0.7, blue: 0.74)
+			core = UIOrbPalette.activeCore
+			accent = UIOrbPalette.activeAccent
+			highlight = UIOrbPalette.activeHighlight
 		} else {
-			core = Color(red: 0.26, green: 0.64, blue: 0.92)
-			accent = Color(red: 0.52, green: 0.86, blue: 0.98)
-			highlight = Color(red: 0.6, green: 0.9, blue: 0.98)
+			core = UIOrbPalette.inactiveCore
+			accent = UIOrbPalette.inactiveAccent
+			highlight = UIOrbPalette.inactiveHighlight
 		}
 	}
 }

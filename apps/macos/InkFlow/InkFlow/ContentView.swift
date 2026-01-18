@@ -26,7 +26,7 @@ struct PanelBackgroundView: View {
 	@AppStorage("appearance.accent") private var accentRaw = AccentOption.sky.rawValue
 	@AppStorage("appearance.glassIntensity") private var glassIntensityRaw = GlassIntensity.standard.rawValue
 	@AppStorage("appearance.windowTranslucency") private var isWindowTranslucent = true
-	private let expandedCornerRadius: CGFloat = 12
+	private let expandedCornerRadius: CGFloat = UIPanelLayout.expandedCornerRadius
 
 	var body: some View {
 		GeometryReader { proxy in
@@ -41,7 +41,7 @@ struct PanelBackgroundView: View {
 			let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 			Group {
 				if #available(macOS 26.0, *), appearance.isTranslucent {
-					GlassEffectContainer(spacing: 8) {
+					GlassEffectContainer(spacing: UISpacing.medium) {
 						Color.clear
 							.frame(maxWidth: .infinity, maxHeight: .infinity)
 							.glassEffect(.regular.tint(appearance.surfaceTint), in: .rect(cornerRadius: cornerRadius))
@@ -54,7 +54,7 @@ struct PanelBackgroundView: View {
 			}
 			.frame(maxWidth: .infinity, maxHeight: .infinity)
 			.allowsHitTesting(false)
-			.animation(.easeInOut(duration: 0.32), value: panelController.isExpanded)
+			.animation(.easeInOut(duration: UIDuration.panelExpand), value: panelController.isExpanded)
 		}
 	}
 }
@@ -77,25 +77,27 @@ struct PanelHeaderView: View {
 	}
 
 	private var headerRow: some View {
-		HStack(alignment: .center, spacing: 9) {
+		HStack(alignment: .center, spacing: HeaderLayout.rowSpacing) {
 			leadingBlock
 			transcriptStrip
 			expandButton
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
+		.frame(height: HeaderLayout.rowHeight, alignment: .center)
 		.textSelection(.disabled)
 	}
 
 	private var leadingBlock: some View {
-		HStack(spacing: 8) {
+		HStack(spacing: HeaderLayout.leadingSpacing) {
 			statusGlyph
 
 			if let error = model.errorMessage {
 				Text(error)
 					.font(.system(size: 13, weight: .medium))
-					.foregroundStyle(.red.opacity(0.85))
+					.foregroundStyle(UIColors.errorText)
 			}
 		}
+		.padding(.leading, HeaderLayout.leadingInset)
 	}
 
 	@ViewBuilder
@@ -118,9 +120,9 @@ struct PanelHeaderView: View {
 				.truncationMode(.tail)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
-		.padding(.vertical, 2)
-		.padding(.horizontal, 4)
-		.frame(height: 24)
+		.padding(.vertical, HeaderLayout.transcriptVerticalPadding)
+		.padding(.horizontal, HeaderLayout.transcriptHorizontalPadding)
+		.frame(height: HeaderLayout.transcriptHeight)
 		.textSelection(.disabled)
 		.allowsHitTesting(false)
 	}
@@ -130,26 +132,31 @@ struct PanelHeaderView: View {
 			Image(systemName: panelController.isExpanded ? "chevron.up" : "chevron.down")
 				.font(.system(size: 11, weight: .semibold))
 				.foregroundStyle(.secondary)
-				.frame(width: 22, height: 22)
+				.frame(width: HeaderLayout.expandButtonSize, height: HeaderLayout.expandButtonSize)
 		}
 		.buttonStyle(.plain)
 		.focusable(false)
-		.animation(.easeInOut(duration: 0.2), value: panelController.isExpanded)
+		.animation(.easeInOut(duration: UIDuration.standard), value: panelController.isExpanded)
 		.accessibilityLabel(panelController.isExpanded ? "Collapse panel" : "Expand panel")
 	}
 
 	@ViewBuilder
 	private var waveformBackdrop: some View {
 		WaveformView(levels: model.waveformLevels, isActive: model.isListening)
-			.opacity(model.isListening ? 0.12 : 0.05)
-			.blur(radius: 0.4)
-			.frame(height: 16)
+			.opacity(model.isListening ? HeaderLayout.waveformActiveOpacity : HeaderLayout.waveformInactiveOpacity)
+			.blur(radius: HeaderLayout.waveformBlurRadius)
+			.frame(height: HeaderLayout.waveformHeight)
 			.mask(waveformFadeMask)
 	}
 
 	private var waveformFadeMask: some View {
 		LinearGradient(
-			colors: [.clear, .white.opacity(0.9), .white.opacity(0.9), .clear],
+			colors: [
+				.clear,
+				.white.opacity(HeaderLayout.waveformMaskOpacity),
+				.white.opacity(HeaderLayout.waveformMaskOpacity),
+				.clear
+			],
 			startPoint: .leading,
 			endPoint: .trailing
 		)
@@ -183,9 +190,9 @@ struct PanelExpandedView: View {
 
 	var body: some View {
 		ZStack(alignment: .topTrailing) {
-			VStack(alignment: .leading, spacing: 8) {
+			VStack(alignment: .leading, spacing: ExpandedLayout.stackSpacing) {
 				modeBar
-				Divider().opacity(0.35)
+				Divider().opacity(ExpandedLayout.dividerOpacity)
 				moduleContent
 			}
 			.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -202,14 +209,14 @@ struct PanelExpandedView: View {
 		.onExitCommand {
 			panelController.handleExitCommand()
 		}
-		.animation(.easeInOut(duration: 0.22), value: panelController.isSettingsPresented)
+		.animation(.easeInOut(duration: UIDuration.panelSettingsToggle), value: panelController.isSettingsPresented)
 	}
 
 	private var modeBar: some View {
-		HStack(spacing: 16) {
+		HStack(spacing: ExpandedLayout.modeBarSpacing) {
 			ForEach(PanelMode.allCases) { mode in
 				ModeTab(title: mode.title, isSelected: selectedMode == mode) {
-					withAnimation(.easeInOut(duration: 0.18)) {
+					withAnimation(.easeInOut(duration: UIDuration.selectionChange)) {
 						selectedMode = mode
 					}
 				}
@@ -224,11 +231,11 @@ struct PanelExpandedView: View {
 			Image(systemName: "slider.horizontal.3")
 				.font(.system(size: 12, weight: .semibold))
 				.foregroundStyle(panelController.isSettingsPresented ? Color.primary : Color.secondary)
-				.frame(width: 26, height: 26)
+				.frame(width: ExpandedLayout.settingsButtonSize, height: ExpandedLayout.settingsButtonSize)
 		}
 		.buttonStyle(.plain)
 		.accessibilityLabel("Settings")
-		.padding(.top, 2)
+		.padding(.top, ExpandedLayout.settingsButtonTopPadding)
 	}
 
 	private var moduleContent: some View {
@@ -238,7 +245,7 @@ struct PanelExpandedView: View {
 
 	private var settingsOverlay: some View {
 		ZStack {
-			Color.black.opacity(0.08)
+			UIColors.overlayScrim
 				.contentShape(Rectangle())
 				.onTapGesture {
 					panelController.closeSettings()
@@ -250,7 +257,7 @@ struct PanelExpandedView: View {
 	}
 
 	private var settingsSheet: some View {
-		VStack(spacing: 12) {
+		VStack(spacing: SettingsSheetLayout.stackSpacing) {
 			HStack {
 				Text("Settings")
 					.font(.system(size: 13, weight: .semibold))
@@ -260,7 +267,7 @@ struct PanelExpandedView: View {
 					Image(systemName: "xmark")
 						.font(.system(size: 11, weight: .semibold))
 						.foregroundStyle(.secondary)
-						.frame(width: 22, height: 22)
+						.frame(width: UISize.iconSmall, height: UISize.iconSmall)
 				}
 				.buttonStyle(.plain)
 				.accessibilityLabel("Close settings")
@@ -268,17 +275,26 @@ struct PanelExpandedView: View {
 
 			SettingsView()
 		}
-		.padding(16)
-		.frame(width: 520, height: 280, alignment: .topLeading)
+		.padding(SettingsSheetLayout.padding)
+		.frame(width: SettingsSheetLayout.width, height: SettingsSheetLayout.height, alignment: .topLeading)
 		.background(settingsSheetBackground)
-		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		.overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-			.strokeBorder(Color.primary.opacity(0.06)))
-		.shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+		.clipShape(RoundedRectangle(cornerRadius: UICornerRadius.medium, style: .continuous))
+		.overlay(
+			RoundedRectangle(cornerRadius: UICornerRadius.medium, style: .continuous)
+				.strokeBorder(UIColors.settingsBorder)
+		)
+		.shadow(
+			color: UIColors.settingsShadow,
+			radius: UIShadow.settingsSheetRadius,
+			x: UIShadow.settingsSheetX,
+			y: UIShadow.settingsSheetY
+		)
 	}
 
 	private var settingsSheetBackground: some View {
-		Color(nsColor: .windowBackgroundColor).opacity(appearance.isTranslucent ? 0.95 : 1.0)
+		Color(nsColor: .windowBackgroundColor).opacity(
+			appearance.isTranslucent ? SettingsSheetLayout.translucentOpacity : 1.0
+		)
 	}
 
 	private var appearance: AppearanceStyle {
@@ -298,20 +314,60 @@ private struct ModeTab: View {
 
 	var body: some View {
 		Button(action: action) {
-			VStack(spacing: 4) {
+			VStack(spacing: ModeTabLayout.spacing) {
 				Text(title)
 					.font(.system(size: 12, weight: .semibold))
 					.foregroundStyle(isSelected ? Color.primary : Color.secondary)
 					.lineLimit(1)
 					.truncationMode(.tail)
 				Rectangle()
-					.frame(height: 1)
-					.foregroundStyle(Color.primary.opacity(isSelected ? 0.6 : 0))
+					.frame(height: UISize.modeUnderlineHeight)
+					.foregroundStyle(isSelected ? UIColors.modeTabIndicatorSelected : UIColors.modeTabIndicatorUnselected)
 			}
 		}
 		.buttonStyle(.plain)
-		.animation(.easeInOut(duration: 0.18), value: isSelected)
+		.animation(.easeInOut(duration: UIDuration.selectionChange), value: isSelected)
 	}
+}
+
+private enum HeaderLayout {
+	static let rowSpacing: CGFloat = 9
+	static let rowHeight: CGFloat = UIPanelLayout.headerHeight
+	static let leadingSpacing: CGFloat = UISpacing.medium
+	static let transcriptVerticalPadding: CGFloat = UISpacing.xxSmall
+	static let transcriptHorizontalPadding: CGFloat = UISpacing.xSmall
+	static let transcriptHeight: CGFloat = UISize.transcriptHeight
+	static let expandButtonSize: CGFloat = UISize.iconSmall
+	static let waveformHeight: CGFloat = UISize.waveformHeight
+	static let waveformActiveOpacity: Double = 0.12
+	static let waveformInactiveOpacity: Double = 0.05
+	static let waveformBlurRadius: CGFloat = 0.4
+	static let waveformMaskOpacity: Double = 0.9
+	static let orbOpticalInset: CGFloat = UISpacing.xxSmall
+	static let leadingInset: CGFloat = max(
+		0,
+		rowSpacing + transcriptHorizontalPadding - UIPanelLayout.padding + orbOpticalInset
+	)
+}
+
+private enum ExpandedLayout {
+	static let stackSpacing: CGFloat = UISpacing.medium
+	static let modeBarSpacing: CGFloat = UISpacing.xLarge
+	static let settingsButtonSize: CGFloat = UISize.iconMedium
+	static let settingsButtonTopPadding: CGFloat = UISpacing.xxSmall
+	static let dividerOpacity: Double = 0.35
+}
+
+private enum SettingsSheetLayout {
+	static let width: CGFloat = 520
+	static let height: CGFloat = 280
+	static let padding: CGFloat = UISpacing.xLarge
+	static let stackSpacing: CGFloat = UISpacing.large
+	static let translucentOpacity: Double = 0.95
+}
+
+private enum ModeTabLayout {
+	static let spacing: CGFloat = UISpacing.xSmall
 }
 
 
@@ -320,11 +376,11 @@ private struct ModeTab: View {
 	let model = InkFlowViewModel()
 	ZStack {
 		PanelBackgroundView(panelController: panelController)
-		VStack(spacing: 6) {
+		VStack(spacing: UIPanelLayout.headerSpacing) {
 			PanelHeaderView(model: model, panelController: panelController)
 			PanelExpandedView(panelController: panelController)
 		}
-		.padding(8)
+		.padding(UIPanelLayout.padding)
 	}
-	.frame(width: 720, height: 360)
+	.frame(width: UIPanelLayout.previewWidth, height: UIPanelLayout.previewHeight)
 }

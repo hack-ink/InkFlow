@@ -35,9 +35,9 @@ final class PanelHostViewController: NSViewController {
 	}
 
 	private func setupViews() {
-		let padding: CGFloat = 8
-		let spacing: CGFloat = 6
-		let headerHeight: CGFloat = 40
+		let padding = UIPanelLayout.padding
+		let spacing = UIPanelLayout.headerSpacing
+		let headerHeight = UIPanelLayout.headerHeight
 
 		backgroundHost.translatesAutoresizingMaskIntoConstraints = false
 		headerHost.translatesAutoresizingMaskIntoConstraints = false
@@ -91,9 +91,9 @@ final class PanelHostViewController: NSViewController {
 	}
 
 	private var expandedContentHeight: CGFloat {
-		let padding: CGFloat = 8
-		let spacing: CGFloat = 6
-		let headerHeight: CGFloat = 40
+		let padding = UIPanelLayout.padding
+		let spacing = UIPanelLayout.headerSpacing
+		let headerHeight = UIPanelLayout.headerHeight
 		let targetHeight = panelController.expandedPanelHeight
 		return max(0, targetHeight - (padding * 2 + spacing + headerHeight))
 	}

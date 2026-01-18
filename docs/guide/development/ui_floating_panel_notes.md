@@ -18,6 +18,15 @@ Purpose: Capture UI decisions and deferred enhancements for the macOS floating p
 - Avoid overriding `NSHostingView` hit testing for drag behavior. It causes SwiftUI controls to stop receiving clicks.
 - Keep the drag behavior in AppKit and keep SwiftUI views focused on interaction and visuals.
 
+## UI constants and layout tokens
+
+- Centralize layout values in `apps/macos/InkFlow/InkFlow/UIConstants.swift`.
+- Prefer named layout enums in each view (for example: `HeaderLayout`, `SettingsLayout`) that map to shared tokens.
+- Keep spacing, sizes, and animation durations readable and consistent. Avoid new magic numbers unless required.
+- For the header, align the activation orb with the transcript text start using:
+  - `leadingInset = rowSpacing + transcriptHorizontalPadding - panelPadding + orbOpticalInset`.
+  - Adjust `orbOpticalInset` for optical balance if the particle glow feels left-heavy.
+
 ## Deferred enhancements
 
 - Add transcript display modes: single-line (default), auto-grow to a capped number of lines, and fully expanded.

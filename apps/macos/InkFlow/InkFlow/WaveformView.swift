@@ -28,14 +28,16 @@ private struct WaveformBars: View {
 	let isActive: Bool
 
 	var body: some View {
-		let safeLevels = levels.isEmpty ? Array(repeating: 0.04, count: 28) : levels
+		let safeLevels = levels.isEmpty
+			? Array(repeating: WaveformLayout.defaultLevel, count: WaveformLayout.defaultBarCount)
+			: levels
 		GeometryReader { proxy in
 			let barCount = safeLevels.count
-			let spacing: CGFloat = 3
+			let spacing = WaveformLayout.barSpacing
 			let totalSpacing = spacing * CGFloat(max(barCount - 1, 0))
-			let barWidth = max((proxy.size.width - totalSpacing) / CGFloat(barCount), 2)
-			let topColor = Color.primary.opacity(isActive ? 0.9 : 0.35)
-			let bottomColor = Color.primary.opacity(isActive ? 0.45 : 0.18)
+			let barWidth = max((proxy.size.width - totalSpacing) / CGFloat(barCount), WaveformLayout.minimumBarWidth)
+			let topColor = isActive ? UIColors.waveformActiveTop : UIColors.waveformInactiveTop
+			let bottomColor = isActive ? UIColors.waveformActiveBottom : UIColors.waveformInactiveBottom
 			let gradient = LinearGradient(colors: [topColor, bottomColor], startPoint: .top, endPoint: .bottom)
 
 			HStack(alignment: .center, spacing: spacing) {
@@ -49,10 +51,18 @@ private struct WaveformBars: View {
 			}
 			.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 		}
-		.animation(.easeOut(duration: 0.08), value: levels)
+		.animation(.easeOut(duration: UIDuration.waveformLevel), value: levels)
 	}
 
 	private func normalized(_ value: CGFloat) -> CGFloat {
-		min(max(value, 0.03), 1.0)
+		min(max(value, WaveformLayout.minimumLevel), 1.0)
 	}
+}
+
+private enum WaveformLayout {
+	static let defaultBarCount: Int = 28
+	static let defaultLevel: CGFloat = 0.04
+	static let minimumLevel: CGFloat = 0.03
+	static let barSpacing: CGFloat = 3
+	static let minimumBarWidth: CGFloat = 2
 }
