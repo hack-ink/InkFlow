@@ -53,7 +53,10 @@ private struct PanelModeTab: View {
 					.truncationMode(.tail)
 				Rectangle()
 					.frame(height: UISize.modeUnderlineHeight)
-					.foregroundStyle(isSelected ? UIColors.modeTabIndicatorSelected : UIColors.modeTabIndicatorUnselected)
+					.foregroundStyle(
+						isSelected
+							? UIColors.modeTabIndicatorSelected
+							: UIColors.modeTabIndicatorUnselected)
 			}
 		}
 		.buttonStyle(.plain)

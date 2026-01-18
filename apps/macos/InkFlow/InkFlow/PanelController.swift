@@ -198,15 +198,17 @@ final class PanelController: ObservableObject {
 		let width = max(1, Int((alignedSize.width * scale).rounded(.up)))
 		let height = max(1, Int((alignedSize.height * scale).rounded(.up)))
 		let colorSpace = CGColorSpaceCreateDeviceRGB()
-		guard let context = CGContext(
-			data: nil,
-			width: width,
-			height: height,
-			bitsPerComponent: 8,
-			bytesPerRow: 0,
-			space: colorSpace,
-			bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-		) else {
+		guard
+			let context = CGContext(
+				data: nil,
+				width: width,
+				height: height,
+				bitsPerComponent: 8,
+				bytesPerRow: 0,
+				space: colorSpace,
+				bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+			)
+		else {
 			return nil
 		}
 		context.scaleBy(x: scale, y: scale)

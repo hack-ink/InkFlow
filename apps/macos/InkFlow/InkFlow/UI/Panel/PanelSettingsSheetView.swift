@@ -35,7 +35,10 @@ struct PanelSettingsSheetView: View {
 			SettingsRootView()
 		}
 		.padding(PanelSettingsSheetLayout.padding)
-		.frame(width: PanelSettingsSheetLayout.width, height: PanelSettingsSheetLayout.height, alignment: .topLeading)
+		.frame(
+			width: PanelSettingsSheetLayout.width, height: PanelSettingsSheetLayout.height,
+			alignment: .topLeading
+		)
 		.background(settingsSheetBackground)
 		.clipShape(RoundedRectangle(cornerRadius: UICornerRadius.medium, style: .continuous))
 		.overlay(

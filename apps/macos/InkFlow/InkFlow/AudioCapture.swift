@@ -33,12 +33,14 @@ final class AudioCapture {
 		sampleRate = inputFormat.sampleRate
 		channelCount = max(inputFormat.channelCount, 1)
 
-		guard let format = AVAudioFormat(
-			commonFormat: .pcmFormatFloat32,
-			sampleRate: sampleRate,
-			channels: 1,
-			interleaved: false
-		) else {
+		guard
+			let format = AVAudioFormat(
+				commonFormat: .pcmFormatFloat32,
+				sampleRate: sampleRate,
+				channels: 1,
+				interleaved: false
+			)
+		else {
 			throw AudioCaptureError.invalidFormat
 		}
 

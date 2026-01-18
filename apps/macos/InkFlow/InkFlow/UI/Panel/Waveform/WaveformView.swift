@@ -33,10 +33,12 @@ private struct WaveformBars: View {
 			let barCount = safeLevels.count
 			let spacing = WaveformLayout.barSpacing
 			let totalSpacing = spacing * CGFloat(max(barCount - 1, 0))
-			let barWidth = max((proxy.size.width - totalSpacing) / CGFloat(barCount), WaveformLayout.minimumBarWidth)
+			let barWidth = max(
+				(proxy.size.width - totalSpacing) / CGFloat(barCount), WaveformLayout.minimumBarWidth)
 			let topColor = isActive ? UIColors.waveformActiveTop : UIColors.waveformInactiveTop
 			let bottomColor = isActive ? UIColors.waveformActiveBottom : UIColors.waveformInactiveBottom
-			let gradient = LinearGradient(colors: [topColor, bottomColor], startPoint: .top, endPoint: .bottom)
+			let gradient = LinearGradient(
+				colors: [topColor, bottomColor], startPoint: .top, endPoint: .bottom)
 
 			HStack(alignment: .center, spacing: spacing) {
 				ForEach(safeLevels.indices, id: \.self) { index in

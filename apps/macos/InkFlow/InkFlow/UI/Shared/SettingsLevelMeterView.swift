@@ -14,7 +14,11 @@ struct SettingsLevelMeterView: View {
 				RoundedRectangle(cornerRadius: height / 2, style: .continuous)
 					.fill(UIColors.levelMeterTrack)
 				RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-					.fill(isActive ? UIColors.levelMeterActiveFill : UIColors.levelMeterInactiveFill)
+					.fill(
+						isActive
+							? UIColors.levelMeterActiveFill
+							: UIColors.levelMeterInactiveFill
+					)
 					.frame(width: filled)
 			}
 		}

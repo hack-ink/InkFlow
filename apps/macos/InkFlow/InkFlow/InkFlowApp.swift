@@ -72,8 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		self.panel = panel
 		panelController.panel = panel
-		NotificationCenter.default.addObserver(self, selector: #selector(panelDidResignKey(_:)), name: NSWindow.didResignKeyNotification, object: panel)
-		NotificationCenter.default.addObserver(self, selector: #selector(panelDidMove(_:)), name: NSWindow.didMoveNotification, object: panel)
+		NotificationCenter.default.addObserver(
+			self, selector: #selector(panelDidResignKey(_:)), name: NSWindow.didResignKeyNotification,
+			object: panel)
+		NotificationCenter.default.addObserver(
+			self, selector: #selector(panelDidMove(_:)), name: NSWindow.didMoveNotification, object: panel)
 		panelController.syncPanelSize(animated: false)
 	}
 
@@ -120,7 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 
 		let menu = NSMenu()
-		let settingsItem = NSMenuItem(title: "Settings...", action: #selector(toggleSettings), keyEquivalent: ",")
+		let settingsItem = NSMenuItem(
+			title: "Settings...", action: #selector(toggleSettings), keyEquivalent: ",")
 		settingsItem.keyEquivalentModifierMask = [.command]
 		settingsItem.target = self
 		menu.addItem(settingsItem)
@@ -150,7 +154,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		let yKey = "panel.origin.y"
 		guard defaults.object(forKey: xKey) != nil,
 			let storedX = defaults.object(forKey: xKey) as? Double,
-			let storedY = defaults.object(forKey: yKey) as? Double else {
+			let storedY = defaults.object(forKey: yKey) as? Double
+		else {
 			panel.center()
 			return
 		}

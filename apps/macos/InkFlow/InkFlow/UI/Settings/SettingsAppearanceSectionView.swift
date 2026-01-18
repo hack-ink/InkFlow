@@ -5,9 +5,9 @@ struct SettingsAppearanceSectionView: View {
 	@AppStorage("appearance.accent") private var accentRaw = AccentOption.sky.rawValue
 	@AppStorage("appearance.glassIntensity") private var glassIntensityRaw = GlassIntensity.standard.rawValue
 	@AppStorage("appearance.windowTranslucency") private var isWindowTranslucent = true
-#if DEBUG
-	@AppStorage("debug.showOrbFrame") private var showOrbFrame = false
-#endif
+	#if DEBUG
+		@AppStorage("debug.showOrbFrame") private var showOrbFrame = false
+	#endif
 
 	private var themeBinding: Binding<ThemePreference> {
 		Binding(
@@ -39,20 +39,27 @@ struct SettingsAppearanceSectionView: View {
 				SettingsGroupView(title: "Accent Color") {
 					LazyVGrid(
 						columns: Array(
-							repeating: GridItem(.fixed(SettingsLayout.accentGridItemSize), spacing: SettingsLayout.accentGridSpacing),
+							repeating: GridItem(
+								.fixed(SettingsLayout.accentGridItemSize),
+								spacing: SettingsLayout.accentGridSpacing),
 							count: SettingsLayout.accentGridColumns
 						),
 						spacing: SettingsLayout.accentGridSpacing
 					) {
 						ForEach(AccentOption.allCases) { option in
 							Button {
-								withAnimation(.easeInOut(duration: UIDuration.selectionChange)) {
+								withAnimation(
+									.easeInOut(duration: UIDuration.selectionChange)
+								) {
 									accentRaw = option.rawValue
 								}
 							} label: {
 								Circle()
 									.fill(option.color)
-									.frame(width: UISize.accentSwatch, height: UISize.accentSwatch)
+									.frame(
+										width: UISize.accentSwatch,
+										height: UISize.accentSwatch
+									)
 									.overlay(selectionRing(for: option))
 							}
 							.buttonStyle(.plain)
@@ -74,12 +81,12 @@ struct SettingsAppearanceSectionView: View {
 						Toggle("Window translucency", isOn: $isWindowTranslucent)
 					}
 				}
-#if DEBUG
-				Divider()
-				SettingsGroupView(title: "Debug") {
-					Toggle("Show orb frame", isOn: $showOrbFrame)
-				}
-#endif
+				#if DEBUG
+					Divider()
+					SettingsGroupView(title: "Debug") {
+						Toggle("Show orb frame", isOn: $showOrbFrame)
+					}
+				#endif
 			}
 			.padding(.vertical, SettingsLayout.scrollVerticalPadding)
 		}

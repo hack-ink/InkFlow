@@ -24,7 +24,8 @@ final class PanelHostViewController: NSViewController {
 		)
 		self.headerHost = NSHostingView(
 			rootView: AppearanceReader { appearance in
-				PanelHeaderView(model: viewModel, panelController: panelController, appearance: appearance)
+				PanelHeaderView(
+					model: viewModel, panelController: panelController, appearance: appearance)
 			}
 		)
 		self.expandedHost = NSHostingView(
@@ -74,16 +75,18 @@ final class PanelHostViewController: NSViewController {
 			constant: headerTopInset(forExpanded: panelController.isExpanded)
 		)
 
-		NSLayoutConstraint.activate([
-			headerTopConstraint,
-			headerHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-			headerHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
-			headerHost.heightAnchor.constraint(equalToConstant: headerHeight),
+		NSLayoutConstraint.activate(
+			[
+				headerTopConstraint,
+				headerHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+				headerHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+				headerHost.heightAnchor.constraint(equalToConstant: headerHeight),
 
-			expandedHost.topAnchor.constraint(equalTo: headerHost.bottomAnchor, constant: spacing),
-			expandedHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-			expandedHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding)
-		].compactMap { $0 })
+				expandedHost.topAnchor.constraint(equalTo: headerHost.bottomAnchor, constant: spacing),
+				expandedHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+				expandedHost.trailingAnchor.constraint(
+					equalTo: view.trailingAnchor, constant: -padding),
+			].compactMap { $0 })
 
 		expandedHeightConstraint = expandedHost.heightAnchor.constraint(equalToConstant: 0)
 		expandedHeightConstraint?.isActive = true

@@ -88,11 +88,13 @@ final class InkFlowViewModel: ObservableObject {
 			return
 		}
 
-		guard client.registerUpdates({ [weak self] update in
-			DispatchQueue.main.async {
-				self?.handleUpdate(update)
-			}
-		}) else {
+		guard
+			client.registerUpdates({ [weak self] update in
+				DispatchQueue.main.async {
+					self?.handleUpdate(update)
+				}
+			})
+		else {
 			status = "Failed to start"
 			errorMessage = "Could not register backend updates."
 			return

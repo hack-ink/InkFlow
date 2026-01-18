@@ -3,21 +3,21 @@ import SwiftUI
 
 struct ActivationOrbView: View {
 	let isActive: Bool
-#if DEBUG
-	@AppStorage("debug.showOrbFrame") private var showsOrbFrame = false
-#endif
+	#if DEBUG
+		@AppStorage("debug.showOrbFrame") private var showsOrbFrame = false
+	#endif
 
 	var body: some View {
 		LetterMorphOrbView(isActive: isActive)
 			.frame(width: UISize.orbDiameter, height: UISize.orbDiameter)
 			.overlay {
-#if DEBUG
-				if showsOrbFrame {
-					Rectangle()
-						.stroke(OrbDebug.frameColor, lineWidth: OrbDebug.frameLineWidth)
-						.allowsHitTesting(false)
-				}
-#endif
+				#if DEBUG
+					if showsOrbFrame {
+						Rectangle()
+							.stroke(OrbDebug.frameColor, lineWidth: OrbDebug.frameLineWidth)
+							.allowsHitTesting(false)
+					}
+				#endif
 			}
 	}
 }
@@ -68,12 +68,15 @@ private final class OrbRenderer {
 
 		for (index, point) in points.enumerated() {
 			let seed = Double(index) * 0.61803398875
-			let drift = sin(time * OrbMotion.driftSpeed + seed * OrbMotion.driftPhase)
+			let drift =
+				sin(time * OrbMotion.driftSpeed + seed * OrbMotion.driftPhase)
 				* OrbMotion.driftAmplitude
 			let base = CGPoint(x: point.x + drift, y: point.y - drift)
 			let baseDepth = Double(base.x) * OrbMotion.depthScale
 			for (layerIndex, layer) in OrbMotion.layers.enumerated() {
-				let jitter = (rand(seed * OrbMotion.jitterSeedA + Double(layerIndex) * OrbMotion.jitterSeedB) - 0.5)
+				let jitter =
+					(rand(seed * OrbMotion.jitterSeedA + Double(layerIndex) * OrbMotion.jitterSeedB)
+						- 0.5)
 					* OrbMotion.jitterAmplitude
 				let transformed = transformPoint(
 					base: base,
@@ -103,9 +106,13 @@ private final class OrbRenderer {
 				y: center.y + transformed.point.y * scale
 			)
 			let face = (0.15 + 0.85 * transformed.face)
-			let size = (isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective) * (0.85 + 0.15 * face)
+			let size =
+				(isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective)
+				* (0.85 + 0.15 * face)
 			let light = clamp(0.7 + transformed.depth * 0.9, min: 0.45, max: 1.0)
-			let alpha = (isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light * face
+			let alpha =
+				(isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light
+				* face
 			let usesAccent = light > 0.84
 			let rect = CGRect(
 				x: position.x - size / 2,
@@ -126,7 +133,9 @@ private final class OrbRenderer {
 				for index in particles.indices {
 					let particle = particles[index]
 					particles[index] = LetterParticle(
-						position: CGPoint(x: particle.position.x + offsetX, y: particle.position.y + offsetY),
+						position: CGPoint(
+							x: particle.position.x + offsetX,
+							y: particle.position.y + offsetY),
 						size: particle.size,
 						alpha: particle.alpha,
 						usesAccent: particle.usesAccent
@@ -384,7 +393,9 @@ private enum LetterSampler {
 				let control1 = element.points[0]
 				let control2 = element.points[1]
 				let end = element.points[2]
-				segments.append(contentsOf: approximateCurve(from: current, control1: control1, control2: control2, to: end))
+				segments.append(
+					contentsOf: approximateCurve(
+						from: current, control1: control1, control2: control2, to: end))
 				current = end
 			case .closeSubpath:
 				segments.append(LineSegment(start: current, end: start))
@@ -452,11 +463,13 @@ private enum LetterSampler {
 		t: CGFloat
 	) -> CGPoint {
 		let mt = 1.0 - t
-		let x = mt * mt * mt * start.x
+		let x =
+			mt * mt * mt * start.x
 			+ 3.0 * mt * mt * t * control1.x
 			+ 3.0 * mt * t * t * control2.x
 			+ t * t * t * end.x
-		let y = mt * mt * mt * start.y
+		let y =
+			mt * mt * mt * start.y
 			+ 3.0 * mt * mt * t * control1.y
 			+ 3.0 * mt * t * t * control2.y
 			+ t * t * t * end.y
@@ -564,7 +577,7 @@ private enum OrbMotion {
 		(-0.06, 0.8),
 		(0.0, 1.0),
 		(0.06, 0.8),
-		(0.12, 0.6)
+		(0.12, 0.6),
 	]
 }
 

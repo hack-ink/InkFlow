@@ -66,7 +66,9 @@ struct PanelHeaderView: View {
 			Image(systemName: panelController.isExpanded ? "chevron.up" : "chevron.down")
 				.font(.system(size: 11, weight: .semibold))
 				.foregroundStyle(.secondary)
-				.frame(width: PanelHeaderLayout.expandButtonSize, height: PanelHeaderLayout.expandButtonSize)
+				.frame(
+					width: PanelHeaderLayout.expandButtonSize,
+					height: PanelHeaderLayout.expandButtonSize)
 		}
 		.buttonStyle(.plain)
 		.focusable(false)
@@ -76,7 +78,11 @@ struct PanelHeaderView: View {
 
 	private var waveformBackdrop: some View {
 		WaveformView(levels: model.waveformLevels, isActive: model.isListening)
-			.opacity(model.isListening ? PanelHeaderLayout.waveformActiveOpacity : PanelHeaderLayout.waveformInactiveOpacity)
+			.opacity(
+				model.isListening
+					? PanelHeaderLayout.waveformActiveOpacity
+					: PanelHeaderLayout.waveformInactiveOpacity
+			)
 			.blur(radius: PanelHeaderLayout.waveformBlurRadius)
 			.frame(height: PanelHeaderLayout.waveformHeight)
 			.mask(waveformFadeMask)
@@ -88,7 +94,7 @@ struct PanelHeaderView: View {
 				.clear,
 				.white.opacity(PanelHeaderLayout.waveformMaskOpacity),
 				.white.opacity(PanelHeaderLayout.waveformMaskOpacity),
-				.clear
+				.clear,
 			],
 			startPoint: .leading,
 			endPoint: .trailing

@@ -27,7 +27,8 @@ struct SettingsMicrophoneSectionView: View {
 				Divider()
 				SettingsGroupView(title: "Input Level") {
 					VStack(alignment: .leading, spacing: SettingsLayout.inlineSpacing) {
-						SettingsLevelMeterView(level: testModel.level, isActive: testModel.isTesting)
+						SettingsLevelMeterView(
+							level: testModel.level, isActive: testModel.isTesting)
 						if testModel.isTesting {
 							Text("Listening...")
 								.font(.caption)

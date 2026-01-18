@@ -6,3 +6,9 @@ excluded:
   - target
 
 line_length: 120
+
+opt_in_rules:
+  - indentation_width
+
+indentation_width:
+  indentation_width: 2
