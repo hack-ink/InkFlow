@@ -32,6 +32,19 @@ Scope: Platform targets, frameworks, speech-to-text architecture, session model,
 - Single Whisper context instance per process.
 - Canonical specification: `docs/spec/core/stt_dictation_pipeline.md`.
 
+## STT modes and routing (current vs planned)
+
+Current implementation supports a single local pipeline:
+
+- Local stream partials with local second-pass correction.
+- Optional local Whisper window refinement when enabled in settings.
+
+Planned architecture introduces a mode router that composes decode modes and inference locations
+without changing the UI contract. Additional modes (batch-only, window-only, stream-only) and
+API-backed engines are planned but are not implemented yet. The mode router is required to keep
+the backend structure readable and LLM-friendly, with clear responsibilities per module and
+minimal branching in the hot path.
+
 ## Text injection (macOS)
 
 - Primary strategy: Set clipboard and synthesize Cmd+V in the previously focused app.

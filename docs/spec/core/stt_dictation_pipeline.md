@@ -26,6 +26,7 @@ This spec is implementation-oriented and code-referenced. The code remains the s
 - Avoid UI duplication bugs (for example, repeated short phrases during silence).
 - Keep the existing UI event contract stable (`stt/partial`, `stt/final`).
 - Keep performance and quality knobs adjustable from the UI.
+- Support English and Chinese input in the current implementation.
 
 ### Non-goals
 
@@ -54,6 +55,10 @@ This document specifies the target architecture. Some parts already exist in cod
 - Silence mitigations:
   - Ignore empty endpoints.
   - Skip Whisper on near-silent audio.
+- **Mode routing (current)**:
+  - Only local stream + local second pass is implemented.
+  - Optional local sliding-window refinement is enabled by settings.
+  - All other mode combinations are TODO.
 
 ### Implemented/Required in v2 (must exist to claim v2 compliance)
 

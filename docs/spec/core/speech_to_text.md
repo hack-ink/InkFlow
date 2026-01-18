@@ -11,6 +11,31 @@ This document describes the speech-to-text integration used by InkFlow (sherpa-o
 - Two-pass finalization: sherpa streaming partials + whisper final text after each endpoint.
 - Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `docs/spec/core/stt_dictation_pipeline.md`).
 
+## Supported languages (current target)
+
+- English and Chinese input are supported in the current implementation.
+- Whisper language selection must allow English and Chinese without forcing a single fixed language.
+- Merge and de-duplication logic must treat CJK text as non-whitespace tokens.
+
+## STT modes and routing (current vs planned)
+
+The backend is moving toward a mode router that composes decode modes and inference locations.
+Only one mode is implemented today, but the mode matrix defines the planned combinations.
+
+Current implementation:
+
+- Local stream partials with local second-pass correction.
+- Optional local Whisper window refinement when enabled in settings.
+
+Planned mode matrix (real-time microphone input):
+
+| Decode mode | Local-only | API-only | Hybrid (mixed local/API stages) |
+| --- | --- | --- | --- |
+| Batch (one-shot after stop) | Local batch decode of the full buffered session. | API batch decode of the full buffered session. | Local batch primary with API fallback, or API batch primary with local fallback. |
+| Sliding-window only | Local window decode on fixed steps. | API window decode on fixed steps. | Local window primary with API window fallback (or policy-based switching). |
+| Stream + second-pass | Local stream + local second-pass. | API stream + API second-pass. | Local stream + API second-pass; API stream + local second-pass. |
+| Stream-only | Local stream only. | API stream only. | Local stream with API stream fallback (or API stream with local fallback). |
+
 ## Quick Start (macOS)
 
 Build the macOS app:
@@ -147,8 +172,8 @@ The default path is auto-discovered relative to the running executable:
   - Path to the whisper GGML model file.
   - Default: auto-discovered (typically `models/whisper/ggml-large-v3-turbo-q8_0.bin`).
 - `INKFLOW_WHISPER_LANGUAGE`
-  - Whisper language code (for example, `en`). Use `auto` to enable language detection.
-  - Default: `en`
+  - Whisper language code (for example, `en` or `zh`). Use `auto` to enable language detection.
+  - Default: `auto`
 - `INKFLOW_WHISPER_NUM_THREADS`
   - Whisper thread count for decoding.
   - Default: whisper-rs default.
