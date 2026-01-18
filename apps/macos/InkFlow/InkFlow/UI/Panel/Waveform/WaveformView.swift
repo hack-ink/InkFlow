@@ -28,9 +28,7 @@ private struct WaveformBars: View {
 	let isActive: Bool
 
 	var body: some View {
-		let safeLevels = levels.isEmpty
-			? Array(repeating: WaveformLayout.defaultLevel, count: WaveformLayout.defaultBarCount)
-			: levels
+		let safeLevels = levels.isEmpty ? WaveformLayout.defaultLevels : levels
 		GeometryReader { proxy in
 			let barCount = safeLevels.count
 			let spacing = WaveformLayout.barSpacing
@@ -65,4 +63,5 @@ private enum WaveformLayout {
 	static let minimumLevel: CGFloat = 0.03
 	static let barSpacing: CGFloat = 3
 	static let minimumBarWidth: CGFloat = 2
+	static let defaultLevels: [CGFloat] = Array(repeating: defaultLevel, count: defaultBarCount)
 }

@@ -7,9 +7,9 @@ final class PanelHostViewController: NSViewController {
 	private let viewModel: InkFlowViewModel
 	private var cancellables: Set<AnyCancellable> = []
 
-	private let backgroundHost: NSHostingView<PanelBackgroundView>
-	private let headerHost: NSHostingView<PanelHeaderView>
-	private let expandedHost: NSHostingView<PanelExpandedView>
+	private let backgroundHost: NSHostingView<AppearanceReader<PanelBackgroundView>>
+	private let headerHost: NSHostingView<AppearanceReader<PanelHeaderView>>
+	private let expandedHost: NSHostingView<AppearanceReader<PanelExpandedView>>
 
 	private var headerTopConstraint: NSLayoutConstraint?
 	private var expandedHeightConstraint: NSLayoutConstraint?
@@ -17,9 +17,21 @@ final class PanelHostViewController: NSViewController {
 	init(panelController: PanelController, viewModel: InkFlowViewModel) {
 		self.panelController = panelController
 		self.viewModel = viewModel
-		self.backgroundHost = NSHostingView(rootView: PanelBackgroundView(panelController: panelController))
-		self.headerHost = NSHostingView(rootView: PanelHeaderView(model: viewModel, panelController: panelController))
-		self.expandedHost = NSHostingView(rootView: PanelExpandedView(panelController: panelController))
+		self.backgroundHost = NSHostingView(
+			rootView: AppearanceReader { appearance in
+				PanelBackgroundView(panelController: panelController, appearance: appearance)
+			}
+		)
+		self.headerHost = NSHostingView(
+			rootView: AppearanceReader { appearance in
+				PanelHeaderView(model: viewModel, panelController: panelController, appearance: appearance)
+			}
+		)
+		self.expandedHost = NSHostingView(
+			rootView: AppearanceReader { appearance in
+				PanelExpandedView(panelController: panelController, appearance: appearance)
+			}
+		)
 		super.init(nibName: nil, bundle: nil)
 	}
 

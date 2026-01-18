@@ -24,99 +24,120 @@ struct ActivationOrbView: View {
 
 private struct LetterMorphOrbView: View {
 	let isActive: Bool
+	@State private var renderer = OrbRenderer()
 	@State private var startTime = Date().timeIntervalSinceReferenceDate
 
 	var body: some View {
 		TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
 			Canvas { context, size in
-				let now = timeline.date.timeIntervalSinceReferenceDate
-				let time = now - startTime
-				let center = CGPoint(x: size.width / 2, y: size.height / 2)
-				let palette = LetterPalette(isActive: isActive)
-				let letterPeriod = OrbMotion.rotationPeriod
-				let rotation = time * (Double.pi * 2.0 / OrbMotion.rotationPeriod)
-				let tilt = OrbMotion.tilt
-				let scale = min(size.width, size.height) * OrbMotion.scaleFactor
-
-				context.blendMode = .plusLighter
-
-				let points = letterPoints(at: time, letterPeriod: letterPeriod)
-				var transformedPoints: [TransformedPoint] = []
-				transformedPoints.reserveCapacity(points.count * OrbMotion.layers.count)
-
-				for (index, point) in points.enumerated() {
-					let seed = Double(index) * 0.61803398875
-					let drift = sin(time * OrbMotion.driftSpeed + seed * OrbMotion.driftPhase)
-						* OrbMotion.driftAmplitude
-					let base = CGPoint(x: point.x + drift, y: point.y - drift)
-					let baseDepth = Double(base.x) * OrbMotion.depthScale
-					for (layerIndex, layer) in OrbMotion.layers.enumerated() {
-						let jitter = (rand(seed * OrbMotion.jitterSeedA + Double(layerIndex) * OrbMotion.jitterSeedB) - 0.5)
-							* OrbMotion.jitterAmplitude
-						let transformed = transformPoint(
-							base: base,
-							depth: baseDepth + layer.depth + jitter,
-							rotation: rotation,
-							tilt: tilt
-						)
-						transformedPoints.append(
-							TransformedPoint(
-								point: transformed.point,
-								perspective: transformed.perspective,
-								depth: transformed.depth,
-								weight: layer.weight,
-								face: transformed.face
-							)
-						)
-					}
-				}
-
-				var particles: [LetterParticle] = []
-				particles.reserveCapacity(transformedPoints.count)
-				var bounds = CGRect.null
-				for transformed in transformedPoints {
-					let perspective = transformed.perspective
-					let position = CGPoint(
-						x: center.x + transformed.point.x * scale,
-						y: center.y + transformed.point.y * scale
-					)
-					let face = (0.15 + 0.85 * transformed.face)
-					let size = (isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective) * (0.85 + 0.15 * face)
-					let light = clamp(0.7 + transformed.depth * 0.9, min: 0.45, max: 1.0)
-					let alpha = (isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light * face
-					let usesAccent = light > 0.84
-					let rect = CGRect(
-						x: position.x - size / 2,
-						y: position.y - size / 2,
-						width: size,
-						height: size
-					)
-					bounds = bounds.union(rect)
-
-					particles.append(
-						LetterParticle(position: position, size: size, alpha: alpha, usesAccent: usesAccent)
-					)
-				}
-				if !bounds.isNull {
-					let offsetX = center.x - bounds.midX
-					let offsetY = center.y - bounds.midY
-					if offsetX != 0 || offsetY != 0 {
-						particles = particles.map { particle in
-							LetterParticle(
-								position: CGPoint(x: particle.position.x + offsetX, y: particle.position.y + offsetY),
-								size: particle.size,
-								alpha: particle.alpha,
-								usesAccent: particle.usesAccent
-							)
-						}
-					}
-				}
-
-				particles.sort { $0.alpha < $1.alpha }
-				drawGlow(context: &context, particles: particles, palette: palette)
-				drawParticles(context: &context, particles: particles, palette: palette)
+				renderer.render(
+					context: &context,
+					size: size,
+					isActive: isActive,
+					startTime: startTime,
+					now: timeline.date.timeIntervalSinceReferenceDate
+				)
 			}
 		}
+	}
+}
+
+private final class OrbRenderer {
+	private var transformedPoints: [TransformedPoint] = []
+	private var particles: [LetterParticle] = []
+
+	func render(
+		context: inout GraphicsContext,
+		size: CGSize,
+		isActive: Bool,
+		startTime: TimeInterval,
+		now: TimeInterval
+	) {
+		let time = now - startTime
+		let center = CGPoint(x: size.width / 2, y: size.height / 2)
+		let palette = LetterPalette(isActive: isActive)
+		let rotation = time * (Double.pi * 2.0 / OrbMotion.rotationPeriod)
+		let tilt = OrbMotion.tilt
+		let scale = min(size.width, size.height) * OrbMotion.scaleFactor
+
+		context.blendMode = .plusLighter
+
+		let points = letterPoints(at: time, letterPeriod: OrbMotion.rotationPeriod)
+		transformedPoints.removeAll(keepingCapacity: true)
+		transformedPoints.reserveCapacity(points.count * OrbMotion.layers.count)
+
+		for (index, point) in points.enumerated() {
+			let seed = Double(index) * 0.61803398875
+			let drift = sin(time * OrbMotion.driftSpeed + seed * OrbMotion.driftPhase)
+				* OrbMotion.driftAmplitude
+			let base = CGPoint(x: point.x + drift, y: point.y - drift)
+			let baseDepth = Double(base.x) * OrbMotion.depthScale
+			for (layerIndex, layer) in OrbMotion.layers.enumerated() {
+				let jitter = (rand(seed * OrbMotion.jitterSeedA + Double(layerIndex) * OrbMotion.jitterSeedB) - 0.5)
+					* OrbMotion.jitterAmplitude
+				let transformed = transformPoint(
+					base: base,
+					depth: baseDepth + layer.depth + jitter,
+					rotation: rotation,
+					tilt: tilt
+				)
+				transformedPoints.append(
+					TransformedPoint(
+						point: transformed.point,
+						perspective: transformed.perspective,
+						depth: transformed.depth,
+						weight: layer.weight,
+						face: transformed.face
+					)
+				)
+			}
+		}
+
+		particles.removeAll(keepingCapacity: true)
+		particles.reserveCapacity(transformedPoints.count)
+		var bounds = CGRect.null
+		for transformed in transformedPoints {
+			let perspective = transformed.perspective
+			let position = CGPoint(
+				x: center.x + transformed.point.x * scale,
+				y: center.y + transformed.point.y * scale
+			)
+			let face = (0.15 + 0.85 * transformed.face)
+			let size = (isActive ? 1.9 : 1.6) * transformed.weight * (0.9 + 0.4 * perspective) * (0.85 + 0.15 * face)
+			let light = clamp(0.7 + transformed.depth * 0.9, min: 0.45, max: 1.0)
+			let alpha = (isActive ? 0.82 : 0.62) * transformed.weight * (0.55 + 0.45 * perspective) * light * face
+			let usesAccent = light > 0.84
+			let rect = CGRect(
+				x: position.x - size / 2,
+				y: position.y - size / 2,
+				width: size,
+				height: size
+			)
+			bounds = bounds.union(rect)
+
+			particles.append(
+				LetterParticle(position: position, size: size, alpha: alpha, usesAccent: usesAccent)
+			)
+		}
+		if !bounds.isNull {
+			let offsetX = center.x - bounds.midX
+			let offsetY = center.y - bounds.midY
+			if offsetX != 0 || offsetY != 0 {
+				for index in particles.indices {
+					let particle = particles[index]
+					particles[index] = LetterParticle(
+						position: CGPoint(x: particle.position.x + offsetX, y: particle.position.y + offsetY),
+						size: particle.size,
+						alpha: particle.alpha,
+						usesAccent: particle.usesAccent
+					)
+				}
+			}
+		}
+
+		particles.sort { $0.alpha < $1.alpha }
+		drawGlow(context: &context, particles: particles, palette: palette, isActive: isActive)
+		drawParticles(context: &context, particles: particles, palette: palette)
 	}
 
 	private func letterPoints(at time: TimeInterval, letterPeriod: TimeInterval) -> [CGPoint] {
@@ -178,7 +199,8 @@ private struct LetterMorphOrbView: View {
 	private func drawGlow(
 		context: inout GraphicsContext,
 		particles: [LetterParticle],
-		palette: LetterPalette
+		palette: LetterPalette,
+		isActive: Bool
 	) {
 		context.drawLayer { layer in
 			layer.addFilter(.blur(radius: 1.2))
