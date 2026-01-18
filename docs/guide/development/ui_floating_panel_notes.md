@@ -26,6 +26,16 @@ Purpose: Capture UI decisions and deferred enhancements for the macOS floating p
 - For the header, align the activation orb with the transcript text start using:
   - `leadingInset = rowSpacing + transcriptHorizontalPadding - panelPadding + orbOpticalInset`.
   - Adjust `orbOpticalInset` for optical balance if the particle glow feels left-heavy.
+- In collapsed mode, center the header vertically by using `(collapsedHeight - headerHeight) / 2` for the header top inset.
+
+## Activation orb layout
+
+- The particle orb centers by its visible particle bounds, not by raw point averages. This keeps the visual center stable across letter morphs.
+- Keep particle centering independent of header layout. The orb frame stays centered in the header, and particle centering happens inside the orb.
+
+## Debug toggles
+
+- Debug builds expose an Appearance > Debug setting for “Show orb frame.” This toggles the AppStorage key `debug.showOrbFrame`.
 
 ## Deferred enhancements
 
