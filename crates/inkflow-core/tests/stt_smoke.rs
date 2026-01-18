@@ -9,11 +9,10 @@ fn engine_initializes_with_local_assets() {
 
 	let result = InkFlowEngine::start(SttSettings::default());
 	match result {
-		Ok(engine) => {
+		Ok(engine) =>
 			if let Err(err) = engine.stop() {
 				panic!("Engine shutdown failed: {}.", err.message);
-			}
-		},
+			},
 		Err(err) => {
 			panic!("Engine initialization failed: {}.", err.message);
 		},

@@ -3,8 +3,8 @@ use std::{
 	os::raw::{c_char, c_void},
 	ptr,
 	sync::{
-		atomic::{AtomicBool, Ordering},
 		Arc, Mutex,
+		atomic::{AtomicBool, Ordering},
 	},
 	thread,
 	time::Duration,
@@ -195,21 +195,21 @@ fn callback_loop(
 			let guard = match engine.lock() {
 				Ok(guard) => guard,
 				Err(_) => {
-				send_payload(
-					callback,
-					user_data,
-					&error_json("engine_lock_failed", "Engine lock poisoned."),
-				);
+					send_payload(
+						callback,
+						user_data,
+						&error_json("engine_lock_failed", "Engine lock poisoned."),
+					);
 					return;
 				},
 			};
 
 			let Some(engine) = guard.as_ref() else {
-			send_payload(
-				callback,
-				user_data,
-				&error_json("engine_missing", "Engine is not available."),
-			);
+				send_payload(
+					callback,
+					user_data,
+					&error_json("engine_missing", "Engine is not available."),
+				);
 				return;
 			};
 
@@ -253,32 +253,29 @@ fn map_error_status(err: &AppError) -> InkFlowStatus {
 
 fn update_to_json(update: AsrUpdate) -> String {
 	match update {
-		AsrUpdate::SherpaPartial(text) => {
-			json!({"kind": "sherpa_partial", "text": text}).to_string()
-		},
+		AsrUpdate::SherpaPartial(text) =>
+			json!({"kind": "sherpa_partial", "text": text}).to_string(),
 		AsrUpdate::WindowScheduled(snapshot) => json!({
 			"kind": "window_scheduled",
 			"snapshot": snapshot_json(snapshot),
 		})
 		.to_string(),
-		AsrUpdate::WindowResult { snapshot, result } => {
-			json!({
-				"kind": "window_result",
-				"snapshot": snapshot_json(snapshot),
-				"result": {
-					"text": result.text,
-					"has_timestamps": result.has_timestamps,
-					"segments": result.segments.iter().map(|segment| {
-						json!({
-							"t0_ms": segment.t0_ms,
-							"t1_ms": segment.t1_ms,
-							"text": segment.text,
-						})
-					}).collect::<Vec<_>>(),
-				}
-			})
-			.to_string()
-		},
+		AsrUpdate::WindowResult { snapshot, result } => json!({
+			"kind": "window_result",
+			"snapshot": snapshot_json(snapshot),
+			"result": {
+				"text": result.text,
+				"has_timestamps": result.has_timestamps,
+				"segments": result.segments.iter().map(|segment| {
+					json!({
+						"t0_ms": segment.t0_ms,
+						"t1_ms": segment.t1_ms,
+						"text": segment.text,
+					})
+				}).collect::<Vec<_>>(),
+			}
+		})
+		.to_string(),
 		AsrUpdate::SegmentEnd {
 			segment_id,
 			sherpa_text,

@@ -6,5 +6,7 @@ pub mod stt;
 
 pub use engine::{AsrUpdate, InkFlowEngine};
 pub use error::AppError;
-pub use settings::{MergeSettings, SherpaSettings, SttSettings, WhisperProfiles, WhisperSettings,
-	WhisperWindowSettings};
+pub use settings::{
+	MergeSettings, SherpaSettings, SttSettings, WhisperProfiles, WhisperSettings,
+	WhisperWindowSettings,
+};

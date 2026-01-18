@@ -1,18 +1,18 @@
+mod modes;
+mod state;
+
 use std::{
-	collections::VecDeque,
 	sync::{Arc, Mutex},
-	time::{Duration, Instant},
+	time::Duration,
 };
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-	domain,
-	error::AppError,
-	settings::SttSettings,
-	stt,
-};
+use crate::{domain, error::AppError, settings::SttSettings, stt};
+
+use modes::{DecodeMode, InferenceMode, ModeRouter, PipelinePlan};
+use state::{SegmentState, WindowState};
 
 #[derive(Debug)]
 pub enum AsrUpdate {
@@ -39,19 +39,70 @@ pub enum AsrUpdate {
 
 #[derive(Debug)]
 enum WhisperJob {
-	SecondPass {
-		segment_id: u64,
-		sample_rate_hz: u32,
-		samples: Vec<f32>,
-		peak_mean_abs: f32,
-	},
-	Window {
-		snapshot: stt::WindowJobSnapshot,
-		audio_16k: Vec<f32>,
-	},
+	SecondPass { segment_id: u64, sample_rate_hz: u32, samples: Vec<f32>, peak_mean_abs: f32 },
+	Window { snapshot: stt::WindowJobSnapshot, audio_16k: Vec<f32> },
 }
 
 pub struct InkFlowEngine {
+	pipeline: SttPipeline,
+}
+
+enum SttPipeline {
+	LocalStreamSecondPass(LocalStreamSecondPassPipeline),
+}
+
+impl InkFlowEngine {
+	pub fn start(stt_settings: SttSettings) -> Result<Self, AppError> {
+		let plan = ModeRouter::resolve(&stt_settings);
+		let pipeline = SttPipeline::start(plan, stt_settings)?;
+		Ok(Self { pipeline })
+	}
+
+	pub fn submit_audio(&self, samples: &[f32], sample_rate_hz: u32) -> Result<(), AppError> {
+		self.pipeline.submit_audio(samples, sample_rate_hz)
+	}
+
+	pub fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
+		self.pipeline.poll_update()
+	}
+
+	pub fn stop(self) -> Result<(), AppError> {
+		self.pipeline.stop()
+	}
+}
+
+impl SttPipeline {
+	fn start(plan: PipelinePlan, stt_settings: SttSettings) -> Result<Self, AppError> {
+		match (plan.decode_mode, plan.inference) {
+			(DecodeMode::StreamSecondPass, InferenceMode::LocalOnly) =>
+				Ok(SttPipeline::LocalStreamSecondPass(LocalStreamSecondPassPipeline::start(
+					stt_settings,
+					plan.window_enabled,
+				)?)),
+		}
+	}
+
+	fn submit_audio(&self, samples: &[f32], sample_rate_hz: u32) -> Result<(), AppError> {
+		match self {
+			SttPipeline::LocalStreamSecondPass(pipeline) =>
+				pipeline.submit_audio(samples, sample_rate_hz),
+		}
+	}
+
+	fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
+		match self {
+			SttPipeline::LocalStreamSecondPass(pipeline) => pipeline.poll_update(),
+		}
+	}
+
+	fn stop(self) -> Result<(), AppError> {
+		match self {
+			SttPipeline::LocalStreamSecondPass(pipeline) => pipeline.stop(),
+		}
+	}
+}
+
+struct LocalStreamSecondPassPipeline {
 	runtime: tokio::runtime::Runtime,
 	cancel: CancellationToken,
 	audio_tx: mpsc::Sender<Vec<f32>>,
@@ -66,10 +117,11 @@ pub struct InkFlowEngine {
 	recognizer: sherpa_onnx::OnlineRecognizer,
 	engine_generation: u64,
 	sample_rate_hz: Mutex<Option<u32>>,
+	window_enabled: bool,
 }
 
-impl InkFlowEngine {
-	pub fn start(stt_settings: SttSettings) -> Result<Self, AppError> {
+impl LocalStreamSecondPassPipeline {
+	fn start(stt_settings: SttSettings, window_enabled: bool) -> Result<Self, AppError> {
 		stt_settings.validate()?;
 
 		let sherpa_config = stt::resolve_sherpa_config(&stt_settings.sherpa)?;
@@ -86,9 +138,8 @@ impl InkFlowEngine {
 
 		let window_profile =
 			stt::WhisperDecodeProfile { best_of: stt_settings.profiles.window_best_of.max(1) };
-		let second_pass_profile = stt::WhisperDecodeProfile {
-			best_of: stt_settings.profiles.second_pass_best_of.max(1),
-		};
+		let second_pass_profile =
+			stt::WhisperDecodeProfile { best_of: stt_settings.profiles.second_pass_best_of.max(1) };
 
 		let runtime = tokio::runtime::Builder::new_multi_thread()
 			.enable_time()
@@ -112,7 +163,7 @@ impl InkFlowEngine {
 			runtime.handle(),
 			cancel.clone(),
 			whisper_config,
-			whisper_ctx.clone(),
+			whisper_ctx,
 			stt_settings.clone(),
 			second_pass_profile,
 			window_profile,
@@ -136,18 +187,16 @@ impl InkFlowEngine {
 			recognizer,
 			engine_generation,
 			sample_rate_hz: Mutex::new(None),
+			window_enabled,
 		})
 	}
 
-	pub fn submit_audio(&self, samples: &[f32], sample_rate_hz: u32) -> Result<(), AppError> {
+	fn submit_audio(&self, samples: &[f32], sample_rate_hz: u32) -> Result<(), AppError> {
 		if samples.is_empty() {
 			return Ok(());
 		}
 		if sample_rate_hz == 0 {
-			return Err(AppError::new(
-				"audio_invalid",
-				"Sample rate must be greater than zero.",
-			));
+			return Err(AppError::new("audio_invalid", "Sample rate must be greater than zero."));
 		}
 
 		self.ensure_asr_worker(sample_rate_hz)?;
@@ -157,7 +206,7 @@ impl InkFlowEngine {
 			.map_err(|_| AppError::new("audio_send_failed", "Failed to submit audio buffer."))
 	}
 
-	pub fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
+	fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
 		let mut guard = self.update_rx.lock().map_err(|_| {
 			AppError::new("update_receive_failed", "Update receiver is unavailable.")
 		})?;
@@ -165,13 +214,12 @@ impl InkFlowEngine {
 		match guard.try_recv() {
 			Ok(update) => Ok(Some(update)),
 			Err(tokio::sync::mpsc::error::TryRecvError::Empty) => Ok(None),
-			Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
-				Err(AppError::new("update_receive_failed", "Update channel disconnected."))
-			},
+			Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) =>
+				Err(AppError::new("update_receive_failed", "Update channel disconnected.")),
 		}
 	}
 
-	pub fn stop(self) -> Result<(), AppError> {
+	fn stop(self) -> Result<(), AppError> {
 		self.cancel.cancel();
 		drop(self.audio_tx);
 
@@ -204,9 +252,10 @@ impl InkFlowEngine {
 
 	fn ensure_asr_worker(&self, sample_rate_hz: u32) -> Result<(), AppError> {
 		{
-			let mut rate_guard = self.sample_rate_hz.lock().map_err(|_| {
-				AppError::new("audio_invalid", "Sample rate state is unavailable.")
-			})?;
+			let mut rate_guard = self
+				.sample_rate_hz
+				.lock()
+				.map_err(|_| AppError::new("audio_invalid", "Sample rate state is unavailable."))?;
 			match *rate_guard {
 				Some(existing) if existing != sample_rate_hz => {
 					return Err(AppError::new(
@@ -221,17 +270,19 @@ impl InkFlowEngine {
 			}
 		}
 
-		let mut handle_guard = self.asr_handle.lock().map_err(|_| {
-			AppError::new("stt_task_failed", "ASR task state is unavailable.")
-		})?;
+		let mut handle_guard = self
+			.asr_handle
+			.lock()
+			.map_err(|_| AppError::new("stt_task_failed", "ASR task state is unavailable."))?;
 		if handle_guard.is_some() {
 			return Ok(());
 		}
 
 		let audio_rx = {
-			let mut guard = self.audio_rx.lock().map_err(|_| {
-				AppError::new("audio_invalid", "Audio receiver is unavailable.")
-			})?;
+			let mut guard = self
+				.audio_rx
+				.lock()
+				.map_err(|_| AppError::new("audio_invalid", "Audio receiver is unavailable."))?;
 			guard.take().ok_or_else(|| {
 				AppError::new("audio_invalid", "Audio receiver has already been consumed.")
 			})?
@@ -257,10 +308,124 @@ impl InkFlowEngine {
 			self.update_tx.clone(),
 			self.second_pass_tx.clone(),
 			self.window_tx.clone(),
+			self.window_enabled,
 		);
 
 		*handle_guard = Some(handle);
 		Ok(())
+	}
+}
+
+struct WhisperWorker {
+	cancel: CancellationToken,
+	whisper_config: stt::WhisperConfig,
+	whisper_ctx: Arc<whisper_rs::WhisperContext>,
+	stt_settings: SttSettings,
+	second_pass_profile: stt::WhisperDecodeProfile,
+	window_profile: stt::WhisperDecodeProfile,
+	update_tx: mpsc::Sender<AsrUpdate>,
+	second_pass_rx: std::sync::mpsc::Receiver<WhisperJob>,
+	window_rx: std::sync::mpsc::Receiver<WhisperJob>,
+}
+
+impl WhisperWorker {
+	fn run(self) {
+		let min_mean_abs = self.stt_settings.window.min_mean_abs;
+		let window_activity_ms = self.stt_settings.window.step_ms.clamp(80, 600);
+		let window_activity_samples_16k = domain::ms_to_samples_16k(window_activity_ms) as usize;
+
+		loop {
+			if self.cancel.is_cancelled() {
+				return;
+			}
+
+			self.drain_second_pass(min_mean_abs);
+
+			if self.cancel.is_cancelled() {
+				return;
+			}
+
+			match self.window_rx.recv_timeout(Duration::from_millis(20)) {
+				Ok(WhisperJob::Window { snapshot, audio_16k }) => {
+					if self.cancel.is_cancelled() {
+						return;
+					}
+
+					if audio_16k.is_empty() {
+						continue;
+					}
+
+					let start = audio_16k.len().saturating_sub(window_activity_samples_16k.max(1));
+					let mean_abs = mean_abs(&audio_16k[start..]);
+					if mean_abs < min_mean_abs {
+						continue;
+					}
+
+					match stt::transcribe_segments(
+						self.whisper_ctx.as_ref(),
+						&audio_16k,
+						&self.whisper_config,
+						self.window_profile,
+					) {
+						Ok(result) => {
+							let _ = self
+								.update_tx
+								.blocking_send(AsrUpdate::WindowResult { snapshot, result });
+						},
+						Err(err) => {
+							eprintln!("Whisper window transcription failed: {}.", err.message);
+						},
+					}
+				},
+				Ok(WhisperJob::SecondPass { .. }) => {},
+				Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
+				Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
+			}
+		}
+	}
+
+	fn drain_second_pass(&self, min_mean_abs: f32) {
+		while let Ok(job) = self.second_pass_rx.try_recv() {
+			if self.cancel.is_cancelled() {
+				return;
+			}
+
+			let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } = job
+			else {
+				continue;
+			};
+
+			if samples.is_empty() {
+				continue;
+			}
+
+			if peak_mean_abs < min_mean_abs {
+				continue;
+			}
+
+			let audio_16k = stt::resample_linear_to_16k(&samples, sample_rate_hz);
+			match stt::transcribe(
+				self.whisper_ctx.as_ref(),
+				&audio_16k,
+				&self.whisper_config,
+				self.second_pass_profile,
+			) {
+				Ok(text) => {
+					let text = text.trim().to_string();
+					if text.is_empty() {
+						continue;
+					}
+					let _ =
+						self.update_tx.blocking_send(AsrUpdate::SecondPass { segment_id, text });
+				},
+				Err(err) => {
+					eprintln!(
+						"Whisper second-pass transcription failed for segment {}: {}.",
+						segment_id, err.message
+					);
+				},
+			}
+		}
 	}
 }
 
@@ -276,95 +441,236 @@ fn spawn_whisper_worker(
 	second_pass_rx: std::sync::mpsc::Receiver<WhisperJob>,
 	window_rx: std::sync::mpsc::Receiver<WhisperJob>,
 ) -> tokio::task::JoinHandle<()> {
-	handle.spawn_blocking(move || {
-		let min_mean_abs = stt_settings.window.min_mean_abs;
-		let window_activity_ms = stt_settings.window.step_ms.clamp(80, 600);
-		let window_activity_samples_16k = domain::ms_to_samples_16k(window_activity_ms) as usize;
+	let worker = WhisperWorker {
+		cancel,
+		whisper_config,
+		whisper_ctx,
+		stt_settings,
+		second_pass_profile,
+		window_profile,
+		update_tx,
+		second_pass_rx,
+		window_rx,
+	};
 
-		loop {
-			if cancel.is_cancelled() {
-				return;
+	handle.spawn_blocking(move || worker.run())
+}
+
+struct StreamWorker {
+	cancel: CancellationToken,
+	stt_settings: SttSettings,
+	recognizer: sherpa_onnx::OnlineRecognizer,
+	stream: sherpa_onnx::OnlineStream,
+	sample_rate: u32,
+	engine_generation: u64,
+	audio_rx: mpsc::Receiver<Vec<f32>>,
+	update_tx: mpsc::Sender<AsrUpdate>,
+	second_pass_tx: std::sync::mpsc::Sender<WhisperJob>,
+	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
+	window_state: WindowState,
+	segment_state: SegmentState,
+	last_text: String,
+	samples_per_read: usize,
+}
+
+impl StreamWorker {
+	fn run(mut self) -> Result<(), AppError> {
+		let mut pending: Vec<f32> = Vec::new();
+		let mut pending_start: usize = 0;
+
+		while let Some(chunk) = self.audio_rx.blocking_recv() {
+			if self.cancel.is_cancelled() {
+				return Ok(());
 			}
 
-			while let Ok(job) = second_pass_rx.try_recv() {
-				if cancel.is_cancelled() {
-					return;
+			pending.extend_from_slice(&chunk);
+
+			while pending.len().saturating_sub(pending_start) >= self.samples_per_read {
+				let end = pending_start.saturating_add(self.samples_per_read);
+				self.process_samples(&pending[pending_start..end])?;
+				pending_start = end;
+
+				if pending_start >= 8_192 && pending_start >= pending.len().saturating_div(2) {
+					pending.drain(..pending_start);
+					pending_start = 0;
 				}
-
-				match job {
-					WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } => {
-						if samples.is_empty() {
-							continue;
-						}
-
-						if peak_mean_abs < min_mean_abs {
-							continue;
-						}
-
-						let audio_16k = stt::resample_linear_to_16k(&samples, sample_rate_hz);
-						match stt::transcribe(
-							whisper_ctx.as_ref(),
-							&audio_16k,
-							&whisper_config,
-							second_pass_profile,
-						) {
-							Ok(text) => {
-								let text = text.trim().to_string();
-								if text.is_empty() {
-									continue;
-								}
-								let _ = update_tx.blocking_send(AsrUpdate::SecondPass { segment_id, text });
-							},
-							Err(err) => {
-								eprintln!(
-									"Whisper second-pass transcription failed for segment {}: {}.",
-									segment_id, err.message
-								);
-							},
-						}
-					},
-					WhisperJob::Window { .. } => {},
-				}
-			}
-
-			match window_rx.recv_timeout(Duration::from_millis(20)) {
-				Ok(WhisperJob::Window { snapshot, audio_16k }) => {
-					if cancel.is_cancelled() {
-						return;
-					}
-
-					if audio_16k.is_empty() {
-						continue;
-					}
-
-					let start =
-						audio_16k.len().saturating_sub(window_activity_samples_16k.max(1));
-					let mean_abs = mean_abs(&audio_16k[start..]);
-					if mean_abs < min_mean_abs {
-						continue;
-					}
-
-					match stt::transcribe_segments(
-						whisper_ctx.as_ref(),
-						&audio_16k,
-						&whisper_config,
-						window_profile,
-					) {
-						Ok(result) => {
-							let _ =
-								update_tx.blocking_send(AsrUpdate::WindowResult { snapshot, result });
-						},
-						Err(err) => {
-							eprintln!("Whisper window transcription failed: {}.", err.message);
-						},
-					}
-				},
-				Ok(WhisperJob::SecondPass { .. }) => {},
-				Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
-				Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
 			}
 		}
-	})
+
+		if pending_start < pending.len() {
+			self.process_samples(&pending[pending_start..])?;
+		}
+
+		if self.cancel.is_cancelled() {
+			return Ok(());
+		}
+
+		self.finalize_stream()?;
+		Ok(())
+	}
+
+	fn process_samples(&mut self, samples: &[f32]) -> Result<(), AppError> {
+		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
+
+		if self.cancel.is_cancelled() || samples.is_empty() {
+			return Ok(());
+		}
+
+		let samples_16k;
+		let samples_for_sherpa: &[f32] = if self.sample_rate == SHERPA_SAMPLE_RATE_HZ {
+			samples
+		} else {
+			samples_16k = stt::resample_linear_to_16k(samples, self.sample_rate);
+			samples_16k.as_slice()
+		};
+
+		self.stream.accept_waveform(SHERPA_SAMPLE_RATE_HZ as i32, samples_for_sherpa);
+		self.segment_state.push_samples(samples);
+		self.window_state.push_samples(samples_for_sherpa);
+
+		self.recognizer.decode(&self.stream);
+
+		let result = self.recognizer.result_json(&self.stream).map_err(|err| {
+			AppError::new(
+				"stt_decode_failed",
+				format!("Failed to decode audio with sherpa-onnx: {err}."),
+			)
+		})?;
+
+		let text = result.text.trim().to_string();
+		self.maybe_emit_partial(&text);
+
+		for (snapshot, audio_16k) in
+			self.window_state.drain_ready_jobs(self.engine_generation, !self.last_text.is_empty())
+		{
+			if self
+				.window_tx
+				.try_send(WhisperJob::Window { snapshot: snapshot.clone(), audio_16k })
+				.is_ok()
+			{
+				let _ = self.update_tx.blocking_send(AsrUpdate::WindowScheduled(snapshot));
+			}
+		}
+
+		if self.stream.is_endpoint() {
+			let sherpa_text = if text.is_empty() { self.last_text.clone() } else { text };
+			self.handle_endpoint(&sherpa_text)?;
+		}
+
+		Ok(())
+	}
+
+	fn maybe_emit_partial(&mut self, text: &str) {
+		if text.is_empty() || text == self.last_text {
+			return;
+		}
+
+		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
+		if !has_voice {
+			return;
+		}
+
+		self.last_text = text.to_string();
+		let _ = self.update_tx.blocking_send(AsrUpdate::SherpaPartial(self.last_text.clone()));
+	}
+
+	fn handle_endpoint(&mut self, sherpa_text: &str) -> Result<(), AppError> {
+		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
+		let window_generation_after = self.window_state.advance_generation();
+
+		if !has_voice || sherpa_text.trim().is_empty() {
+			let _ =
+				self.update_tx.blocking_send(AsrUpdate::EndpointReset { window_generation_after });
+			self.segment_state.reset();
+			self.last_text.clear();
+			self.stream.reset();
+			return Ok(());
+		}
+
+		let segment_id = self.segment_state.next_segment_id();
+		let _ = self.update_tx.blocking_send(AsrUpdate::SegmentEnd {
+			segment_id,
+			sherpa_text: sherpa_text.to_string(),
+			committed_end_16k_samples: self.window_state.total_16k_samples(),
+			window_generation_after,
+		});
+
+		let (segment_samples, peak_mean_abs) = self.segment_state.take();
+		let _ = self.second_pass_tx.send(WhisperJob::SecondPass {
+			segment_id,
+			sample_rate_hz: self.sample_rate,
+			samples: segment_samples,
+			peak_mean_abs,
+		});
+
+		self.last_text.clear();
+		self.stream.reset();
+		Ok(())
+	}
+
+	fn finalize_stream(&mut self) -> Result<(), AppError> {
+		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
+		const TAIL_PADDING_MS: u64 = 300;
+
+		let tail_samples = (self.sample_rate as u64)
+			.saturating_mul(TAIL_PADDING_MS)
+			.saturating_div(1_000) as usize;
+		if tail_samples > 0 {
+			let tail = vec![0.0f32; tail_samples];
+			let tail_16k_samples = (SHERPA_SAMPLE_RATE_HZ as u64)
+				.saturating_mul(TAIL_PADDING_MS)
+				.saturating_div(1_000) as usize;
+			if tail_16k_samples > 0 {
+				let tail_16k = vec![0.0f32; tail_16k_samples];
+				self.stream.accept_waveform(SHERPA_SAMPLE_RATE_HZ as i32, &tail_16k);
+			}
+			self.segment_state.push_samples(&tail);
+		}
+
+		self.stream.input_finished();
+		self.recognizer.decode(&self.stream);
+
+		let result = self.recognizer.result_json(&self.stream).map_err(|err| {
+			AppError::new(
+				"stt_decode_failed",
+				format!("Failed to decode audio with sherpa-onnx: {err}."),
+			)
+		})?;
+
+		let final_text = result.text.trim().to_string();
+		let fallback_text = if final_text.is_empty() { self.last_text.clone() } else { final_text };
+
+		if self.segment_state.is_empty() {
+			return Ok(());
+		}
+
+		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
+		let window_generation_after = self.window_state.advance_generation();
+
+		if !has_voice || fallback_text.trim().is_empty() {
+			let _ =
+				self.update_tx.blocking_send(AsrUpdate::EndpointReset { window_generation_after });
+			return Ok(());
+		}
+
+		let segment_id = self.segment_state.next_segment_id();
+		let _ = self.update_tx.blocking_send(AsrUpdate::SegmentEnd {
+			segment_id,
+			sherpa_text: fallback_text,
+			committed_end_16k_samples: self.window_state.total_16k_samples(),
+			window_generation_after,
+		});
+
+		let (segment_samples, peak_mean_abs) = self.segment_state.take();
+		let _ = self.second_pass_tx.send(WhisperJob::SecondPass {
+			segment_id,
+			sample_rate_hz: self.sample_rate,
+			samples: segment_samples,
+			peak_mean_abs,
+		});
+
+		Ok(())
+	}
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -376,253 +682,38 @@ fn spawn_asr_worker(
 	stream: sherpa_onnx::OnlineStream,
 	sample_rate: u32,
 	engine_generation: u64,
-	mut audio_rx: mpsc::Receiver<Vec<f32>>,
+	audio_rx: mpsc::Receiver<Vec<f32>>,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_tx: std::sync::mpsc::Sender<WhisperJob>,
 	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
+	window_enabled: bool,
 ) -> tokio::task::JoinHandle<Result<(), AppError>> {
 	handle.spawn_blocking(move || -> Result<(), AppError> {
-		const TAIL_PADDING_MS: u64 = 300;
-		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
-
 		let chunk_ms = stt_settings.sherpa.chunk_ms as u64;
 		let samples_per_read =
 			(sample_rate as u64).saturating_mul(chunk_ms).saturating_div(1_000).max(1) as usize;
 
-		let window_enabled = stt_settings.window.enabled;
-		let step = Duration::from_millis(stt_settings.window.step_ms);
-		let emit_every = stt_settings.window.emit_every.max(1) as u64;
-		let window_len_16k_samples = domain::ms_to_samples_16k(
-			stt_settings.window.window_ms.saturating_add(stt_settings.window.context_ms),
-		)
-		.max(1) as usize;
-		let context_len_16k_samples =
-			domain::ms_to_samples_16k(stt_settings.window.context_ms) as usize;
+		let window_state = WindowState::new(&stt_settings, window_enabled);
+		let segment_state = SegmentState::new();
 
-		let mut last_text = String::new();
-		let mut pending: Vec<f32> = Vec::new();
-		let mut pending_start = 0usize;
-		let mut segment_id: u64 = 0;
-		let mut segment_buffer: Vec<f32> = Vec::new();
-		let mut segment_peak_mean_abs: f32 = 0.0;
-
-		let mut window_ring: VecDeque<f32> = VecDeque::with_capacity(window_len_16k_samples);
-		let mut total_16k_samples: u64 = 0;
-		let mut window_generation: u64 = 0;
-		let mut window_job_id: u64 = 0;
-		let mut tick_index: u64 = 0;
-		let mut next_tick = Instant::now() + step;
-
-		let mut process_samples = |samples: &[f32]| -> Result<(), AppError> {
-			if cancel.is_cancelled() {
-				return Ok(());
-			}
-
-			if samples.is_empty() {
-				return Ok(());
-			}
-
-			let samples_16k;
-			let samples_for_sherpa: &[f32] = if sample_rate == SHERPA_SAMPLE_RATE_HZ {
-				samples
-			} else {
-				samples_16k = stt::resample_linear_to_16k(samples, sample_rate);
-				samples_16k.as_slice()
-			};
-
-			stream.accept_waveform(SHERPA_SAMPLE_RATE_HZ as i32, samples_for_sherpa);
-			segment_buffer.extend_from_slice(samples);
-			segment_peak_mean_abs = segment_peak_mean_abs.max(mean_abs(samples));
-
-			if window_enabled {
-				if sample_rate == SHERPA_SAMPLE_RATE_HZ {
-					total_16k_samples = total_16k_samples.saturating_add(samples.len() as u64);
-					window_ring.extend(samples.iter().copied());
-				} else {
-					total_16k_samples =
-						total_16k_samples.saturating_add(samples_for_sherpa.len() as u64);
-					window_ring.extend(samples_for_sherpa.iter().copied());
-				}
-				while window_ring.len() > window_len_16k_samples {
-					window_ring.pop_front();
-				}
-			}
-
-			recognizer.decode(&stream);
-
-			let result = recognizer.result_json(&stream).map_err(|err| {
-				AppError::new(
-					"stt_decode_failed",
-					format!("Failed to decode audio with sherpa-onnx: {err}."),
-				)
-			})?;
-
-			let text = result.text.trim().to_string();
-			if !text.is_empty() && text != last_text {
-				let has_voice = segment_peak_mean_abs >= stt_settings.window.min_mean_abs;
-				if has_voice {
-					last_text = text.clone();
-					let _ = update_tx.blocking_send(AsrUpdate::SherpaPartial(text.clone()));
-				}
-			}
-
-			if window_enabled && !window_ring.is_empty() && !last_text.is_empty() {
-				let now = Instant::now();
-				while now >= next_tick {
-					tick_index = tick_index.saturating_add(1);
-
-					if tick_index.is_multiple_of(emit_every) {
-						window_job_id = window_job_id.saturating_add(1);
-
-						let audio_16k: Vec<f32> = window_ring.iter().copied().collect();
-						let snapshot = stt::WindowJobSnapshot {
-							engine_generation,
-							window_generation,
-							job_id: window_job_id,
-							window_end_16k_samples: total_16k_samples,
-							window_len_16k_samples: audio_16k.len(),
-							context_len_16k_samples: context_len_16k_samples.min(audio_16k.len()),
-						};
-
-						if window_tx
-							.try_send(WhisperJob::Window { snapshot: snapshot.clone(), audio_16k })
-							.is_ok()
-						{
-							let _ = update_tx.blocking_send(AsrUpdate::WindowScheduled(snapshot));
-						}
-					}
-
-					next_tick += step;
-				}
-			}
-
-			if stream.is_endpoint() {
-				let sherpa_text = if text.is_empty() { last_text.clone() } else { text.clone() };
-				let has_voice = segment_peak_mean_abs >= stt_settings.window.min_mean_abs;
-
-				window_generation = window_generation.saturating_add(1);
-
-				if !has_voice || sherpa_text.trim().is_empty() {
-					let _ = update_tx.blocking_send(AsrUpdate::EndpointReset {
-						window_generation_after: window_generation,
-					});
-					segment_buffer.clear();
-					segment_peak_mean_abs = 0.0;
-					last_text.clear();
-					stream.reset();
-					return Ok(());
-				}
-
-				segment_id = segment_id.saturating_add(1);
-				let _ = update_tx.blocking_send(AsrUpdate::SegmentEnd {
-					segment_id,
-					sherpa_text,
-					committed_end_16k_samples: total_16k_samples,
-					window_generation_after: window_generation,
-				});
-
-				let segment_samples = std::mem::take(&mut segment_buffer);
-				let _ = second_pass_tx.send(WhisperJob::SecondPass {
-					segment_id,
-					sample_rate_hz: sample_rate,
-					samples: segment_samples,
-					peak_mean_abs: segment_peak_mean_abs,
-				});
-				segment_peak_mean_abs = 0.0;
-
-				last_text.clear();
-				stream.reset();
-			}
-
-			Ok(())
+		let worker = StreamWorker {
+			cancel,
+			stt_settings,
+			recognizer,
+			stream,
+			sample_rate,
+			engine_generation,
+			audio_rx,
+			update_tx,
+			second_pass_tx,
+			window_tx,
+			window_state,
+			segment_state,
+			last_text: String::new(),
+			samples_per_read,
 		};
 
-		while let Some(chunk) = audio_rx.blocking_recv() {
-			if cancel.is_cancelled() {
-				return Ok(());
-			}
-
-			pending.extend_from_slice(&chunk);
-
-			while pending.len().saturating_sub(pending_start) >= samples_per_read {
-				let end = pending_start.saturating_add(samples_per_read);
-				process_samples(&pending[pending_start..end])?;
-				pending_start = end;
-
-				if pending_start >= 8_192 && pending_start >= pending.len().saturating_div(2) {
-					pending.drain(..pending_start);
-					pending_start = 0;
-				}
-			}
-		}
-
-		if pending_start < pending.len() {
-			process_samples(&pending[pending_start..])?;
-		}
-
-		if cancel.is_cancelled() {
-			return Ok(());
-		}
-
-		let tail_samples =
-			(sample_rate as u64).saturating_mul(TAIL_PADDING_MS).saturating_div(1_000) as usize;
-		if tail_samples > 0 {
-			let tail = vec![0.0f32; tail_samples];
-			let tail_16k_samples = (SHERPA_SAMPLE_RATE_HZ as u64)
-				.saturating_mul(TAIL_PADDING_MS)
-				.saturating_div(1_000) as usize;
-			if tail_16k_samples > 0 {
-				let tail_16k = vec![0.0f32; tail_16k_samples];
-				stream.accept_waveform(SHERPA_SAMPLE_RATE_HZ as i32, &tail_16k);
-			}
-			segment_buffer.extend_from_slice(&tail);
-		}
-
-		stream.input_finished();
-		recognizer.decode(&stream);
-
-		let result = recognizer.result_json(&stream).map_err(|err| {
-			AppError::new(
-				"stt_decode_failed",
-				format!("Failed to decode audio with sherpa-onnx: {err}."),
-			)
-		})?;
-
-		let final_text = result.text.trim().to_string();
-		let fallback_text = if final_text.is_empty() { last_text } else { final_text };
-
-		if segment_buffer.is_empty() {
-			return Ok(());
-		}
-
-		let has_voice = segment_peak_mean_abs >= stt_settings.window.min_mean_abs;
-
-		window_generation = window_generation.saturating_add(1);
-
-		if !has_voice || fallback_text.trim().is_empty() {
-			let _ = update_tx.blocking_send(AsrUpdate::EndpointReset {
-				window_generation_after: window_generation,
-			});
-			return Ok(());
-		}
-
-		segment_id = segment_id.saturating_add(1);
-		let _ = update_tx.blocking_send(AsrUpdate::SegmentEnd {
-			segment_id,
-			sherpa_text: fallback_text,
-			committed_end_16k_samples: total_16k_samples,
-			window_generation_after: window_generation,
-		});
-
-		let segment_samples = std::mem::take(&mut segment_buffer);
-		let _ = second_pass_tx.send(WhisperJob::SecondPass {
-			segment_id,
-			sample_rate_hz: sample_rate,
-			samples: segment_samples,
-			peak_mean_abs: segment_peak_mean_abs,
-		});
-
-		Ok(())
+		worker.run()
 	})
 }
 

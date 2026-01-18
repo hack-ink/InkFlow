@@ -262,10 +262,7 @@ pub fn extract_window_tail_text(text: &str, window_len_16k_samples: usize) -> St
 		return text.trim().to_string();
 	}
 
-	let estimated_tokens = window_len_16k_samples
-		.saturating_mul(16)
-		.saturating_div(1000)
-		.max(1);
+	let estimated_tokens = window_len_16k_samples.saturating_mul(16).saturating_div(1000).max(1);
 	let take = estimated_tokens.min(words);
 	let start = words.saturating_sub(take);
 	let tail_tokens = &tokens[start..];
@@ -337,7 +334,7 @@ fn lcp_len(a: &[NToken], b: &[NToken]) -> usize {
 			break;
 		}
 	}
-	
+
 	n
 }
 

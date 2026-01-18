@@ -5,7 +5,8 @@
 //!
 //! The shared library lookup follows these rules:
 //!
-//! - If `INKFLOW_SHERPA_ONNX_DYLIB` is set, it is treated as an explicit path to the shared library.
+//! - If `INKFLOW_SHERPA_ONNX_DYLIB` is set, it is treated as an explicit path to the shared
+//!   library.
 //! - Otherwise, the loader searches for the platform-specific library name in common locations
 //!   relative to the current executable.
 

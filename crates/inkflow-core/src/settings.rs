@@ -142,7 +142,12 @@ pub struct WhisperSettings {
 
 impl Default for WhisperSettings {
 	fn default() -> Self {
-		Self { model_path: String::new(), language: "en".into(), num_threads: None, force_gpu: None }
+		Self {
+			model_path: String::new(),
+			language: "auto".into(),
+			num_threads: None,
+			force_gpu: None,
+		}
 	}
 }
 
@@ -228,7 +233,12 @@ pub struct MergeSettings {
 
 impl Default for MergeSettings {
 	fn default() -> Self {
-		Self { stable_ticks: 3, rollback_threshold_tokens: 8, overlap_k_words: 30, overlap_k_chars: 100 }
+		Self {
+			stable_ticks: 3,
+			rollback_threshold_tokens: 8,
+			overlap_k_words: 30,
+			overlap_k_chars: 100,
+		}
 	}
 }
 
@@ -257,6 +267,17 @@ impl MergeSettings {
 pub struct WhisperProfiles {
 	pub window_best_of: u8,
 	pub second_pass_best_of: u8,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::WhisperSettings;
+
+	#[test]
+	fn whisper_default_language_is_auto() {
+		let settings = WhisperSettings::default();
+		assert_eq!(settings.language, "auto");
+	}
 }
 
 impl Default for WhisperProfiles {
