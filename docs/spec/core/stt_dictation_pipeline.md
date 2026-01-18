@@ -24,7 +24,7 @@ This spec is implementation-oriented and code-referenced. The code remains the s
 - Improve live text quality via Whisper sliding-window refinement.
 - Preserve fast finalization semantics with Whisper second pass per endpoint.
 - Avoid UI duplication bugs (for example, repeated short phrases during silence).
-- Keep the existing UI event contract stable (`stt/partial`, `stt/final`).
+- Keep the existing UI event contract stable (`live_render`, `segment_end`).
 - Keep performance and quality knobs adjustable from the UI.
 - Support English and Chinese input in the current implementation.
 
@@ -50,7 +50,7 @@ This document specifies the target architecture. Some parts already exist in cod
 ### Implemented today (baseline)
 
 - Sherpa-onnx streaming partials and endpoint detection.
-- Segment-based transcript model (`stt_segments` + `stt_live_text`) and revision-ordered `stt/partial` events.
+- Segment-based transcript model (`stt_segments` + `stt_live_text`) and backend-stabilized `live_render` events.
 - Whisper second pass on each endpoint that replaces the provisional segment text in-place.
 - Silence mitigations:
   - Ignore empty endpoints.
@@ -60,20 +60,24 @@ This document specifies the target architecture. Some parts already exist in cod
   - Optional local sliding-window refinement is enabled by settings.
   - All other mode combinations are TODO.
 
-### Implemented/Required in v2 (must exist to claim v2 compliance)
+### Implemented/Required in v2 (current status)
 
 - **Forced-finalize behavior** on `Enter`:
-  - Finalize must not depend on a natural sherpa endpoint.
+  - Finalize must not depend on a natural sherpa endpoint. **Status: TODO.**
 - **Window scheduling that never backlogs**:
-  - Bounded queue + drop ticks.
+  - Bounded second-pass queue, window drop-on-full, and dynamic backpressure. **Status: Implemented.**
 - **Stale window result rejection**:
-  - Window results must be dropped if computed on an older audio snapshot / generation.
+  - Window results are dropped if computed on an older generation or end offset. **Status: Implemented.**
 - **Language-aware / timestamp-aware de-duplication**:
-  - Robust for languages without whitespace (e.g., Chinese).
+  - Time-axis cut by committed end plus token/character overlap trimming. **Status: Implemented.**
 - **Live stability mechanism with rollback**:
-  - UI should see mostly append-only changes, but must allow limited corrections.
+  - Stable/unstable merge with rollback threshold and stable ticks. **Status: Implemented.**
+- **Activity gating upgrades**:
+  - RMS, zero-crossing, and band-energy gating for window and second pass. **Status: Implemented.**
+- **Endpoint tail compensation**:
+  - Tail padding for second pass via pending tail buffer. **Status: Implemented.**
 - **UI-first Settings**:
-  - All tunables adjustable from UI (env vars are dev-only, optional).
+  - All tunables adjustable from UI (env vars are dev-only, optional). **Status: TODO.**
 ---
 
 ## 1. User Experience Contract
@@ -97,7 +101,7 @@ The SwiftUI app controls dictation explicitly:
 
 Backend is the single source of truth for transcript updates and timing.
 
-Code anchor: `apps/macos/InkFlow/InkFlow/ContentView.swift`, `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflow-ffi/src/lib.rs`.
+Code anchor: `apps/macos/InkFlow/InkFlow/ContentView.swift`, `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkflow-ffi/src/lib.rs`.
 
 ### 1.3 Finalization Must Capture the Last Words (Forced Finalize)
 
@@ -112,7 +116,7 @@ On `Enter`:
 3. If there is buffered audio since the last committed segment:
    - If it passes silence gating **and** minimum duration requirements, commit a provisional segment and enqueue a second-pass Whisper job.
    - If it is near-silent, do not create a segment.
-4. Wait for required second-pass job(s) (at least the final segment) and then emit `stt/final`.
+4. Wait for required second-pass job(s) (at least the final segment) and then emit `segment_end`.
 
 This removes the "last words missing / last segment not cleaned up" failure mode.
 
@@ -120,7 +124,7 @@ This removes the "last words missing / last segment not cleaned up" failure mode
 
 UI receives JSON updates through the FFI callback. The SwiftUI app builds the displayed transcript from:
 
-- `sherpa_partial` and `window_result` for live text.
+- `live_render` for live text (backend-stabilized).
 - `segment_end` for committed segments.
 - `second_pass` to replace a committed segment with Whisper output.
 
@@ -129,7 +133,7 @@ Implication:
 - The Rust engine should emit updates that are mostly append-only in the live tail.
 - The UI must tolerate rewrites when accuracy improves.
 
-Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflow-ffi/src/lib.rs`.
+Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkflow-ffi/src/lib.rs`.
 
 ---
 
@@ -176,12 +180,14 @@ Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflo
 
 ### 3.2 Backend Engine
 
-`crates/inkflow-core/src/engine.rs`:
+`packages/inkflow-core/src/engine.rs`:
 
 - Owns the STT pipeline and exposes `InkFlowEngine` for FFI use.
 - Receives audio buffers, manages sherpa streaming, and schedules Whisper work.
 - Emits JSON update events via the FFI layer.
 - Maintains segment and window state required for refinement and finalization.
+- Live render/merge state: `packages/inkflow-core/src/engine/render.rs`.
+- Second-pass queue and backpressure: `packages/inkflow-core/src/engine/queue.rs`.
 
 ### 3.3 Audio Capture
 
@@ -192,8 +198,8 @@ Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `crates/inkflo
 
 ### 3.4 STT Wrappers and Configuration
 
-- Sherpa: `crates/inkflow-core/src/stt/mod.rs`.
-- Whisper: `crates/inkflow-core/src/stt/whisper.rs`.
+- Sherpa: `packages/inkflow-core/src/stt.rs`.
+- Whisper: `packages/inkflow-core/src/stt/whisper.rs`.
 
 ### 3.5 Engine Manager + Settings (v2 required)
 
@@ -215,13 +221,13 @@ New component: `EngineManager` (or equivalent):
 ### 4.1 Backend → UI Events
 
 - `session/state`
-- `stt/partial`:
-  - `session_id`, `revision`, `text`, `strategy`
-  - `strategy`: `vad_chunk` | `sliding_window`
-- `stt/final`
+- `live_render`:
+  - `text` (backend-stabilized live transcript)
+- `segment_end`
 - `llm/rewrite`
 - `error`
 - Optional `engine/state` (recommended)
+ - Optional `sherpa_partial` / `window_result` for diagnostics
 
 ### 4.2 UI → Backend Commands
 
@@ -319,7 +325,7 @@ On each endpoint + forced-finalize:
 
 - Decode endpoint audio.
 - Replace segment text.
-- Emit `stt/partial` (revision++)
+- Emit `live_render` with the current backend-stabilized live text.
 
 ### 6.4 Whisper Sliding-window Responsibilities
 
@@ -327,7 +333,7 @@ While speaking:
 
 - Every `step_ms`, decode last `window_ms` (plus optional `context_ms`)
 - Merge into live tail without duplicating committed text.
-- Emit `stt/partial` with `strategy=sliding_window`.
+- Emit `live_render` with the latest window-stabilized live text.
 Sliding-window must never mutate committed segments.
 
 ---
@@ -370,7 +376,7 @@ If window decode time approaches/exceeds `step_ms`, reduce window frequency or p
 ### 7.6 Cancellation and Finalization
 
 - `escape`: stop capture, drop window, do not wait for second-pass
-- `enter`: stop capture, forced-finalize if needed, wait for required second-pass, then emit `stt/final`
+- `enter`: stop capture, forced-finalize if needed, wait for required second-pass, then emit `segment_end`
 
 ---
 
@@ -441,7 +447,7 @@ On endpoint (natural or forced):
 
 ### 8.7 Empty/Whitespace Update Rules
 
-- Do not emit `stt/partial` if the only change is empty/whitespace-only live tail.
+- Do not emit `live_render` if the only change is empty/whitespace-only live tail.
 - Do not create segments for silent endpoints.
 - Do not run whisper on near-silent audio.
 ---
@@ -461,10 +467,10 @@ Dev builds (optional):
 
 - Sherpa: model_dir, provider, threads, decoding method, endpoint rules, chunk_ms, int8 prefs.
 - Whisper: model_path, language, threads, force_gpu.
-- Whisper profiles:
-- Window profile (fast)  - Second-pass profile (accurate)
-- Sliding-window: enabled, window_ms, step_ms, context_ms, min_mean_abs, emit_every.
-- Merge/stability: N, rollback_threshold, overlap_K (word/char)
+- Whisper profiles: window_best_of, second_pass_best_of.
+- Sliding-window: enabled, window_ms, step_ms, context_ms, min_mean_abs, min_rms, max_zero_crossing_rate, min_band_energy_ratio, emit_every, endpoint_tail_ms, window_backpressure_high_watermark.
+- Second-pass queue: second_pass_queue_capacity.
+- Merge/stability: stable_ticks, rollback_threshold_tokens, overlap_k_words, overlap_k_chars.
 
 ### 9.3 Apply Levels (no restart for normal users)
 
@@ -479,6 +485,8 @@ Normal UI must not require restart.
 - `best_of`: 1..=8
 - Window_ms >= step_ms.
 - Chunk_ms within safe bounds.
+- Backpressure and queue capacities must be greater than zero.
+- Zero-crossing and band-energy ratios must be within 0.0..=1.0.
 - Reject invalid settings atomically (no partial apply)
 ---
 
@@ -496,13 +504,13 @@ Env-gated or settings-gated logs (no absolute paths):
 
 - UI: `apps/macos/InkFlow/InkFlow/ContentView.swift`
 - UI state and callbacks: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`
-- FFI bridge: `crates/inkflow-ffi/src/lib.rs`
+- FFI bridge: `packages/inkflow-ffi/src/lib.rs`
 - Mic capture: `apps/macos/InkFlow/InkFlow/AudioCapture.swift`
-- Sherpa: `crates/inkflow-core/src/stt/mod.rs`.
-- Whisper: `crates/inkflow-core/src/stt/whisper.rs`.
+- Sherpa: `packages/inkflow-core/src/stt.rs`.
+- Whisper: `packages/inkflow-core/src/stt/whisper.rs`.
 - Harness: `research/stt_compare/...`
-- Settings: `crates/inkflow-core/src/settings.rs`
-- Engine: `crates/inkflow-core/src/engine.rs`
+- Settings: `packages/inkflow-core/src/settings.rs`
+- Engine: `packages/inkflow-core/src/engine.rs`
 - Implementation notes: `docs/guide/development/stt_dictation_pipeline_impl_notes.md`
 
 ---
@@ -517,7 +525,7 @@ Env-gated or settings-gated logs (no absolute paths):
 # Appendix A: Minimal "Must Pass" Behavioral Tests (v2)
 
 1. Forced finalize correctness:
-   - Speak then immediately release Space; `stt/final` must include last words.
+   - Speak then immediately release Space; `segment_end` must include last words.
 2. No duplicate committed text from window:
    - Two sentences with a pause; window must not re-emit sentence 1 in tail.
 3. Chinese stability:
@@ -1130,7 +1138,7 @@ fn merge_window_into_live_text(
 }
 ```
 
-## C.9 Emission gating and revision
+## C.9 Emission gating
 
 When applying a new live text:
 
@@ -1138,8 +1146,7 @@ When applying a new live text:
 - If `live_text` is unchanged and committed segments unchanged, do not emit.
 - Otherwise:
   - `session.stt_live_text = live_text`
-  - `session.stt_revision += 1`
-  - Emit `stt/partial { revision, text: build_stt_text(), strategy: sliding_window }`.
+  - Emit `live_render { text: build_stt_text() }`.
 ---
 
 # Appendix D: UI Guidance for "No App Restart" Experience

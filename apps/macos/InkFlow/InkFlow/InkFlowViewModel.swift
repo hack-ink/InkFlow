@@ -129,10 +129,12 @@ final class InkFlowViewModel: ObservableObject {
 
 	private func handleUpdate(_ update: InkFlowUpdate) {
 		switch update.kind {
-		case "sherpa_partial":
+		case "live_render":
 			liveText = update.text ?? ""
+		case "sherpa_partial":
+			break
 		case "window_result":
-			liveText = update.result?.text ?? update.text ?? liveText
+			break
 		case "segment_end":
 			let text = update.text ?? ""
 			let segmentId = update.segmentId ?? UInt64(segments.count + 1)

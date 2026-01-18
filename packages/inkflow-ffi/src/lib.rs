@@ -253,6 +253,11 @@ fn map_error_status(err: &AppError) -> InkFlowStatus {
 
 fn update_to_json(update: AsrUpdate) -> String {
 	match update {
+		AsrUpdate::LiveRender { text } => json!({
+			"kind": "live_render",
+			"text": text,
+		})
+		.to_string(),
 		AsrUpdate::SherpaPartial(text) =>
 			json!({"kind": "sherpa_partial", "text": text}).to_string(),
 		AsrUpdate::WindowScheduled(snapshot) => json!({

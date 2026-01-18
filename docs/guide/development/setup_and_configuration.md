@@ -8,7 +8,7 @@ Key build settings:
 
 - Bundle identifier: `ink.hack.InkFlow`.
 - Bridging header: `InkFlow/InkFlowBridge.h`.
-- Header search path: `$(SRCROOT)/../../../crates/inkflow-ffi/include`.
+- Header search path: `$(SRCROOT)/../../../packages/inkflow-ffi/include`.
 - Run Script phase: build `inkflow-ffi`, copy `libinkflow_ffi.dylib`, stage sherpa-onnx and ONNX Runtime dylibs, and link `models/` into app resources for development.
 
 ### Run Script Phase (Build inkflow-ffi)
@@ -102,7 +102,7 @@ allow microphone access when Hardened Runtime is enabled.
 
 ## FFI Headers
 
-- The C ABI header lives at `crates/inkflow-ffi/include/inkflow.h`.
+- The C ABI header lives at `packages/inkflow-ffi/include/inkflow.h`.
 - The Swift bridging header lives at `apps/macos/InkFlow/InkFlow/InkFlowBridge.h` and includes `inkflow.h`.
 
 ## Cargo Make (Repository Rules)

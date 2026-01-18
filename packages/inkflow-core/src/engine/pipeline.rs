@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+	collections::VecDeque,
+	sync::{Arc, Mutex},
+};
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -7,6 +10,8 @@ use crate::{error::AppError, settings::SttSettings, stt};
 
 use super::{
 	AsrUpdate,
+	queue::SecondPassQueue,
+	render::RenderState,
 	modes::{DecodeMode, InferenceMode, PipelinePlan},
 	worker::{WhisperJob, spawn_asr_worker, spawn_whisper_worker},
 };
@@ -55,9 +60,9 @@ pub(crate) struct LocalStreamSecondPassPipeline {
 	cancel: CancellationToken,
 	audio_tx: mpsc::Sender<Vec<f32>>,
 	audio_rx: Mutex<Option<mpsc::Receiver<Vec<f32>>>>,
-	update_tx: mpsc::Sender<AsrUpdate>,
-	update_rx: Mutex<mpsc::Receiver<AsrUpdate>>,
-	second_pass_tx: std::sync::mpsc::Sender<WhisperJob>,
+	raw_update_tx: mpsc::Sender<AsrUpdate>,
+	raw_update_rx: Mutex<mpsc::Receiver<AsrUpdate>>,
+	second_pass_queue: Arc<SecondPassQueue>,
 	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
 	asr_handle: Mutex<Option<tokio::task::JoinHandle<Result<(), AppError>>>>,
 	whisper_handle: tokio::task::JoinHandle<()>,
@@ -66,6 +71,8 @@ pub(crate) struct LocalStreamSecondPassPipeline {
 	engine_generation: u64,
 	sample_rate_hz: Mutex<Option<u32>>,
 	window_enabled: bool,
+	render_state: Mutex<RenderState>,
+	pending_updates: Mutex<VecDeque<AsrUpdate>>,
 }
 
 impl LocalStreamSecondPassPipeline {
@@ -99,8 +106,9 @@ impl LocalStreamSecondPassPipeline {
 		const WINDOW_QUEUE_CAPACITY: usize = 2;
 
 		let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>(AUDIO_QUEUE_CAPACITY);
-		let (update_tx, update_rx) = mpsc::channel::<AsrUpdate>(UPDATE_QUEUE_CAPACITY);
-		let (second_pass_tx, second_pass_rx) = std::sync::mpsc::channel::<WhisperJob>();
+		let (raw_update_tx, raw_update_rx) = mpsc::channel::<AsrUpdate>(UPDATE_QUEUE_CAPACITY);
+		let second_pass_queue =
+			Arc::new(SecondPassQueue::new(stt_settings.second_pass_queue_capacity));
 		let (window_tx, window_rx) =
 			std::sync::mpsc::sync_channel::<WhisperJob>(WINDOW_QUEUE_CAPACITY);
 
@@ -115,8 +123,8 @@ impl LocalStreamSecondPassPipeline {
 			stt_settings.clone(),
 			second_pass_profile,
 			window_profile,
-			update_tx.clone(),
-			second_pass_rx,
+			raw_update_tx.clone(),
+			second_pass_queue.clone(),
 			window_rx,
 		);
 
@@ -125,9 +133,9 @@ impl LocalStreamSecondPassPipeline {
 			cancel,
 			audio_tx,
 			audio_rx: Mutex::new(Some(audio_rx)),
-			update_tx,
-			update_rx: Mutex::new(update_rx),
-			second_pass_tx,
+			raw_update_tx,
+			raw_update_rx: Mutex::new(raw_update_rx),
+			second_pass_queue,
 			window_tx,
 			asr_handle: Mutex::new(None),
 			whisper_handle,
@@ -136,6 +144,8 @@ impl LocalStreamSecondPassPipeline {
 			engine_generation,
 			sample_rate_hz: Mutex::new(None),
 			window_enabled,
+			render_state: Mutex::new(RenderState::new()),
+			pending_updates: Mutex::new(VecDeque::new()),
 		})
 	}
 
@@ -155,15 +165,45 @@ impl LocalStreamSecondPassPipeline {
 	}
 
 	fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
-		let mut guard = self.update_rx.lock().map_err(|_| {
+		let mut pending = self.pending_updates.lock().map_err(|_| {
+			AppError::new("update_receive_failed", "Pending update queue is unavailable.")
+		})?;
+		if let Some(next) = pending.pop_front() {
+			return Ok(Some(next));
+		}
+
+		let mut guard = self.raw_update_rx.lock().map_err(|_| {
 			AppError::new("update_receive_failed", "Update receiver is unavailable.")
 		})?;
 
-		match guard.try_recv() {
-			Ok(update) => Ok(Some(update)),
-			Err(tokio::sync::mpsc::error::TryRecvError::Empty) => Ok(None),
-			Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) =>
-				Err(AppError::new("update_receive_failed", "Update channel disconnected.")),
+		loop {
+			match guard.try_recv() {
+				Ok(update) => {
+					if let Ok(mut renderer) = self.render_state.lock() {
+						if let Some(rendered) =
+							renderer.handle_update(&update, &self.stt_settings)
+						{
+							pending.push_back(rendered);
+						}
+
+						if renderer.should_forward(&update) {
+							pending.push_back(update);
+						}
+					} else {
+						pending.push_back(update);
+					}
+					if let Some(next) = pending.pop_front() {
+						return Ok(Some(next));
+					}
+				},
+				Err(tokio::sync::mpsc::error::TryRecvError::Empty) => return Ok(None),
+				Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
+					return Err(AppError::new(
+						"update_receive_failed",
+						"Update channel disconnected.",
+					));
+				},
+			}
 		}
 	}
 
@@ -253,8 +293,8 @@ impl LocalStreamSecondPassPipeline {
 			sample_rate_hz,
 			self.engine_generation,
 			audio_rx,
-			self.update_tx.clone(),
-			self.second_pass_tx.clone(),
+			self.raw_update_tx.clone(),
+			self.second_pass_queue.clone(),
 			self.window_tx.clone(),
 			self.window_enabled,
 		);

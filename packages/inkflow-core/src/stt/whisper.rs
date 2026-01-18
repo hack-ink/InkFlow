@@ -192,10 +192,53 @@ fn append_trimmed_text(out: &mut String, trimmed: &str) {
 	}
 
 	if !out.is_empty() {
-		out.push(' ');
+		let last = out.chars().last().unwrap_or(' ');
+		let next = trimmed.chars().next().unwrap_or(' ');
+		if should_insert_space(last, next) {
+			out.push(' ');
+		}
 	}
 
 	out.push_str(trimmed);
+}
+
+fn should_insert_space(left: char, right: char) -> bool {
+	if is_cjk(left) || is_cjk(right) {
+		return false;
+	}
+
+	left.is_ascii_alphanumeric() && right.is_ascii_alphanumeric()
+}
+
+fn is_cjk(c: char) -> bool {
+	let u = c as u32;
+	matches!(
+		u,
+		0x4E00..=0x9FFF
+			| 0x3400..=0x4DBF
+			| 0x3040..=0x309F
+			| 0x30A0..=0x30FF
+			| 0xAC00..=0xD7AF
+	)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::append_trimmed_text;
+
+	#[test]
+	fn append_trimmed_text_inserts_space_between_latin_tokens() {
+		let mut out = String::from("hello");
+		append_trimmed_text(&mut out, "world");
+		assert_eq!(out, "hello world");
+	}
+
+	#[test]
+	fn append_trimmed_text_avoids_space_for_cjk() {
+		let mut out = String::from("你好");
+		append_trimmed_text(&mut out, "世界");
+		assert_eq!(out, "你好世界");
+	}
 }
 
 fn build_decode_params(

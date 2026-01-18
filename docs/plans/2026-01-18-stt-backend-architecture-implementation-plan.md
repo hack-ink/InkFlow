@@ -32,12 +32,12 @@ Expected: Tests pass. If failures exist, report and ask how to proceed.
 ### Task 1: Default Whisper language to auto (English + Chinese support)
 
 **Files:**
-- Modify: `crates/inkflow-core/src/settings.rs`
-- Test: `crates/inkflow-core/src/settings.rs`
+- Modify: `packages/inkflow-core/src/settings.rs`
+- Test: `packages/inkflow-core/src/settings.rs`
 
 **Step 1: Write the failing test**
 
-Add to `crates/inkflow-core/src/settings.rs`:
+Add to `packages/inkflow-core/src/settings.rs`:
 
 ```rust
 #[cfg(test)]
@@ -75,7 +75,7 @@ Expected: PASS.
 **Step 5: Commit (only if explicitly requested)**
 
 ```bash
-git add crates/inkflow-core/src/settings.rs
+git add packages/inkflow-core/src/settings.rs
 git commit -m "feat: default whisper language to auto"
 ```
 
@@ -84,13 +84,13 @@ git commit -m "feat: default whisper language to auto"
 ### Task 2: Add a mode router and pipeline plan (local stream + local second pass)
 
 **Files:**
-- Create: `crates/inkflow-core/src/engine/modes.rs`
-- Modify: `crates/inkflow-core/src/engine.rs`
-- Test: `crates/inkflow-core/src/engine/modes.rs`
+- Create: `packages/inkflow-core/src/engine/modes.rs`
+- Modify: `packages/inkflow-core/src/engine.rs`
+- Test: `packages/inkflow-core/src/engine/modes.rs`
 
 **Step 1: Write the failing test**
 
-Create `crates/inkflow-core/src/engine/modes.rs` with this test and stub types:
+Create `packages/inkflow-core/src/engine/modes.rs` with this test and stub types:
 
 ```rust
 use crate::settings::SttSettings;
@@ -162,7 +162,7 @@ Expected: PASS.
 **Step 5: Commit (only if explicitly requested)**
 
 ```bash
-git add crates/inkflow-core/src/engine/modes.rs crates/inkflow-core/src/engine.rs
+git add packages/inkflow-core/src/engine/modes.rs packages/inkflow-core/src/engine.rs
 git commit -m "feat: add stt mode router plan"
 ```
 
@@ -171,13 +171,13 @@ git commit -m "feat: add stt mode router plan"
 ### Task 3: Extract window and segment state structs for clarity
 
 **Files:**
-- Create: `crates/inkflow-core/src/engine/state.rs`
-- Modify: `crates/inkflow-core/src/engine.rs`
-- Test: `crates/inkflow-core/src/engine/state.rs`
+- Create: `packages/inkflow-core/src/engine/state.rs`
+- Modify: `packages/inkflow-core/src/engine.rs`
+- Test: `packages/inkflow-core/src/engine/state.rs`
 
 **Step 1: Write the failing tests**
 
-Create `crates/inkflow-core/src/engine/state.rs` with tests and stub types:
+Create `packages/inkflow-core/src/engine/state.rs` with tests and stub types:
 
 ```rust
 use std::collections::VecDeque;
@@ -393,7 +393,7 @@ Expected: PASS.
 **Step 5: Commit (only if explicitly requested)**
 
 ```bash
-git add crates/inkflow-core/src/engine/state.rs crates/inkflow-core/src/engine.rs
+git add packages/inkflow-core/src/engine/state.rs packages/inkflow-core/src/engine.rs
 git commit -m "refactor: extract window and segment state"
 ```
 
@@ -402,8 +402,8 @@ git commit -m "refactor: extract window and segment state"
 ### Task 4: Refactor the engine to use the router and state structs
 
 **Files:**
-- Modify: `crates/inkflow-core/src/engine.rs`
-- Modify: `crates/inkflow-core/src/lib.rs`
+- Modify: `packages/inkflow-core/src/engine.rs`
+- Modify: `packages/inkflow-core/src/lib.rs`
 
 **Step 1: Write the failing test (router already failing if not integrated)**
 
@@ -432,7 +432,7 @@ Expected: PASS.
 **Step 4: Commit (only if explicitly requested)**
 
 ```bash
-git add crates/inkflow-core/src/engine.rs crates/inkflow-core/src/lib.rs
+git add packages/inkflow-core/src/engine.rs packages/inkflow-core/src/lib.rs
 git commit -m "refactor: modularize stt engine pipeline"
 ```
 

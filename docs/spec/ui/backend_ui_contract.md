@@ -6,7 +6,7 @@ The Rust engine is the single source of truth for transcription events. The Swif
 
 ## Header location
 
-- `crates/inkflow-ffi/include/inkflow.h`
+- `packages/inkflow-ffi/include/inkflow.h`
 - The SwiftUI app includes it via the bridging header `apps/macos/InkFlow/InkFlow/InkFlowBridge.h`.
 
 ## Status codes
@@ -75,18 +75,24 @@ Common shape:
 
 ```json
 {
-  "kind": "sherpa_partial",
+  "kind": "live_render",
   "text": "hello world"
 }
 ```
 
-#### `sherpa_partial`
+#### `live_render`
 
 ```json
-{ "kind": "sherpa_partial", "text": "partial text" }
+{ "kind": "live_render", "text": "backend-stabilized live text" }
 ```
 
-#### `window_result`
+#### `sherpa_partial` (diagnostic)
+
+```json
+{ "kind": "sherpa_partial", "text": "raw sherpa partial" }
+```
+
+#### `window_result` (diagnostic)
 
 ```json
 {

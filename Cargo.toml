@@ -1,9 +1,9 @@
 [workspace]
 members = [
-	"crates/inkflow-core",
-	"crates/inkflow-ffi",
-	"crates/sherpa-onnx",
-	"crates/sherpa-onnx-sys",
+	"packages/inkflow-core",
+	"packages/inkflow-ffi",
+	"packages/sherpa-onnx",
+	"packages/sherpa-onnx-sys",
 	"research/stt_compare",
 ]
 resolver = "3"
@@ -41,8 +41,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 vergen-gitcl       = { version = "1.0", features = ["cargo"] }
 whisper-rs         = { version = "0.15" }
 # self
-sherpa-onnx     = { version = "0.1", path = "crates/sherpa-onnx" }
-sherpa-onnx-sys = { version = "0.1", path = "crates/sherpa-onnx-sys" }
+sherpa-onnx     = { version = "0.1", path = "packages/sherpa-onnx" }
+sherpa-onnx-sys = { version = "0.1", path = "packages/sherpa-onnx-sys" }
 
 [profile.ci-dev]
 incremental = false

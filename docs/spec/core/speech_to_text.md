@@ -9,7 +9,7 @@ This document describes the speech-to-text integration used by InkFlow (sherpa-o
 - Performance-first defaults (int8 where practical).
 - Minimal native build (C API only; disable unused components).
 - Two-pass finalization: sherpa streaming partials + whisper final text after each endpoint.
-- Optional live refinement (planned): whisper sliding-window decoding for higher-quality partial text (canonical spec: `docs/spec/core/stt_dictation_pipeline.md`).
+- Optional live refinement (implemented): whisper sliding-window decoding when windowing is enabled (canonical spec: `docs/spec/core/stt_dictation_pipeline.md`).
 
 ## Supported languages (current target)
 
@@ -254,10 +254,10 @@ cmake --install build-macos-min
 
 ## Repository Integration Notes
 
-- `crates/inkflow-core` owns the speech pipeline and model loading.
-- `crates/inkflow-ffi` exposes the C ABI used by the SwiftUI app.
-- `crates/sherpa-onnx-sys` generates bindings at build time from `vendor/sherpa_onnx_c_api.h`.
-- `crates/sherpa-onnx` loads the native library at runtime (`libloading`) and exposes:
+- `packages/inkflow-core` owns the speech pipeline and model loading.
+- `packages/inkflow-ffi` exposes the C ABI used by the SwiftUI app.
+- `packages/sherpa-onnx-sys` generates bindings at build time from `vendor/sherpa_onnx_c_api.h`.
+- `packages/sherpa-onnx` loads the native library at runtime (`libloading`) and exposes:
   - `OnlineRecognizer`
   - `OnlineStream`
   - `OnlineResult` parsed from the C API JSON output.

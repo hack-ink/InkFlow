@@ -20,8 +20,8 @@ Scope: Platform targets, frameworks, speech-to-text architecture, session model,
 
 ## Rust core
 
-- `crates/inkflow-core` owns the speech pipeline, decoding, and merge logic.
-- `crates/inkflow-ffi` exposes a stable C ABI and delivers updates via callbacks.
+- `packages/inkflow-core` owns the speech pipeline, decoding, and merge logic.
+- `packages/inkflow-ffi` exposes a stable C ABI and delivers updates via callbacks.
 - The SwiftUI app must treat the Rust engine as the source of truth for transcript updates.
 
 ## Speech-to-text architecture (summary)
@@ -72,7 +72,7 @@ minimal branching in the hot path.
 ├── apps/
 │   └── macos/
 │       └── InkFlow/                 # SwiftUI macOS app (Xcode project).
-├── crates/
+├── packages/
 │   ├── inkflow-core/                # Rust core engine and STT pipeline.
 │   ├── inkflow-ffi/                 # C ABI wrapper around inkflow-core.
 │   ├── sherpa-onnx-sys/             # Bindgen-generated FFI for sherpa-onnx C API.
@@ -88,11 +88,11 @@ minimal branching in the hot path.
 
 ## Key boundaries
 
-### `crates/inkflow-core`
+### `packages/inkflow-core`
 
 Owns speech recognition, decoding, and merge logic. It must remain platform-agnostic.
 
-### `crates/inkflow-ffi`
+### `packages/inkflow-ffi`
 
 Exposes a stable C ABI for Swift. The ABI is the only supported integration point for the macOS app.
 

@@ -1,6 +1,9 @@
 mod modes;
 mod pipeline;
+mod queue;
+mod render;
 mod state;
+mod text;
 mod worker;
 
 use crate::{error::AppError, settings::SttSettings, stt};
@@ -10,6 +13,9 @@ use pipeline::SttPipeline;
 
 #[derive(Debug)]
 pub enum AsrUpdate {
+	LiveRender {
+		text: String,
+	},
 	SherpaPartial(String),
 	WindowScheduled(stt::WindowJobSnapshot),
 	WindowResult {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct SttSettings {
 	pub sherpa: SherpaSettings,
@@ -10,6 +10,20 @@ pub struct SttSettings {
 	pub window: WhisperWindowSettings,
 	pub merge: MergeSettings,
 	pub profiles: WhisperProfiles,
+	pub second_pass_queue_capacity: usize,
+}
+
+impl Default for SttSettings {
+	fn default() -> Self {
+		Self {
+			sherpa: SherpaSettings::default(),
+			whisper: WhisperSettings::default(),
+			window: WhisperWindowSettings::default(),
+			merge: MergeSettings::default(),
+			profiles: WhisperProfiles::default(),
+			second_pass_queue_capacity: 16,
+		}
+	}
 }
 
 impl SttSettings {
@@ -19,11 +33,30 @@ impl SttSettings {
 		self.window.validate()?;
 		self.merge.validate()?;
 		self.profiles.validate()?;
+		self.validate_queue_limits()?;
 
 		if self.window.enabled && self.window.window_ms < self.window.step_ms {
 			return Err(AppError::new(
 				"settings_invalid",
 				"window_ms must be greater than or equal to step_ms.",
+			));
+		}
+
+		Ok(())
+	}
+
+	fn validate_queue_limits(&self) -> Result<(), AppError> {
+		if self.window.window_backpressure_high_watermark == 0 {
+			return Err(AppError::new(
+				"settings_invalid",
+				"window_backpressure_high_watermark must be greater than zero.",
+			));
+		}
+
+		if self.second_pass_queue_capacity == 0 {
+			return Err(AppError::new(
+				"settings_invalid",
+				"second_pass_queue_capacity must be greater than zero.",
 			));
 		}
 
@@ -181,7 +214,12 @@ pub struct WhisperWindowSettings {
 	pub step_ms: u64,
 	pub context_ms: u64,
 	pub min_mean_abs: f32,
+	pub min_rms: f32,
+	pub max_zero_crossing_rate: f32,
+	pub min_band_energy_ratio: f32,
 	pub emit_every: u32,
+	pub endpoint_tail_ms: u64,
+	pub window_backpressure_high_watermark: usize,
 }
 
 impl Default for WhisperWindowSettings {
@@ -192,7 +230,12 @@ impl Default for WhisperWindowSettings {
 			step_ms: 400,
 			context_ms: 800,
 			min_mean_abs: 0.001,
+			min_rms: 0.001,
+			max_zero_crossing_rate: 0.35,
+			min_band_energy_ratio: 0.15,
 			emit_every: 1,
+			endpoint_tail_ms: 200,
+			window_backpressure_high_watermark: 16,
 		}
 	}
 }
@@ -211,6 +254,33 @@ impl WhisperWindowSettings {
 			return Err(AppError::new(
 				"settings_invalid",
 				"min_mean_abs must be a finite number greater than or equal to zero.",
+			));
+		}
+
+		if !self.min_rms.is_finite() || self.min_rms < 0.0 {
+			return Err(AppError::new(
+				"settings_invalid",
+				"min_rms must be a finite number greater than or equal to zero.",
+			));
+		}
+
+		if !self.max_zero_crossing_rate.is_finite()
+			|| self.max_zero_crossing_rate < 0.0
+			|| self.max_zero_crossing_rate > 1.0
+		{
+			return Err(AppError::new(
+				"settings_invalid",
+				"max_zero_crossing_rate must be a finite number between 0.0 and 1.0.",
+			));
+		}
+
+		if !self.min_band_energy_ratio.is_finite()
+			|| self.min_band_energy_ratio < 0.0
+			|| self.min_band_energy_ratio > 1.0
+		{
+			return Err(AppError::new(
+				"settings_invalid",
+				"min_band_energy_ratio must be a finite number between 0.0 and 1.0.",
 			));
 		}
 
@@ -272,11 +342,26 @@ pub struct WhisperProfiles {
 #[cfg(test)]
 mod tests {
 	use super::WhisperSettings;
+	use super::SttSettings;
 
 	#[test]
 	fn whisper_default_language_is_auto() {
 		let settings = WhisperSettings::default();
 		assert_eq!(settings.language, "auto");
+	}
+
+	#[test]
+	fn window_backpressure_high_watermark_must_be_positive() {
+		let mut settings = SttSettings::default();
+		settings.window.window_backpressure_high_watermark = 0;
+		assert!(settings.validate().is_err());
+	}
+
+	#[test]
+	fn second_pass_queue_capacity_must_be_positive() {
+		let mut settings = SttSettings::default();
+		settings.second_pass_queue_capacity = 0;
+		assert!(settings.validate().is_err());
 	}
 }
 

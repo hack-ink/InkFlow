@@ -103,8 +103,9 @@ impl WindowState {
 		&mut self,
 		engine_generation: u64,
 		should_emit: bool,
+		allow_emit: bool,
 	) -> Vec<(stt::WindowJobSnapshot, Vec<f32>)> {
-		if !self.enabled || !should_emit || self.window_ring.is_empty() {
+		if !self.enabled || self.window_ring.is_empty() {
 			return Vec::new();
 		}
 
@@ -112,7 +113,7 @@ impl WindowState {
 		let mut jobs = Vec::new();
 		while now >= self.next_tick {
 			self.tick_index = self.tick_index.saturating_add(1);
-			if self.tick_index.is_multiple_of(self.emit_every) {
+			if allow_emit && should_emit && self.tick_index.is_multiple_of(self.emit_every) {
 				self.window_job_id = self.window_job_id.saturating_add(1);
 				let audio_16k: Vec<f32> = self.window_ring.iter().copied().collect();
 				let snapshot = stt::WindowJobSnapshot {

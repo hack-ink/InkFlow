@@ -304,7 +304,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(SRCROOT)/../../../crates/inkflow-ffi/include",
+					"$(SRCROOT)/../../../packages/inkflow-ffi/include",
 				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ink Flow needs access to the microphone for live dictation.";
@@ -343,7 +343,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(SRCROOT)/../../../crates/inkflow-ffi/include",
+					"$(SRCROOT)/../../../packages/inkflow-ffi/include",
 				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ink Flow needs access to the microphone for live dictation.";
