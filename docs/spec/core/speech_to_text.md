@@ -11,6 +11,14 @@ This document describes the speech-to-text integration used by InkFlow (sherpa-o
 - Two-pass finalization: sherpa streaming partials + whisper final text after each endpoint.
 - Optional live refinement (implemented): whisper sliding-window decoding when windowing is enabled (canonical spec: `docs/spec/core/stt_dictation_pipeline.md`).
 
+## Target orchestration model
+
+The long-term architecture uses a single Orchestrator with explicit Scheduler and Fusion Engine
+roles. All decoders (stream, window, second-pass, batch, API) emit a uniform hypothesis output,
+and the Fusion Engine produces the single user-facing `RenderUpdate` used by the UI.
+
+Reference: `docs/spec/core/stt_orchestrator_architecture.md`.
+
 ## Supported languages (current target)
 
 - English and Chinese input are supported in the current implementation.
@@ -19,8 +27,9 @@ This document describes the speech-to-text integration used by InkFlow (sherpa-o
 
 ## STT modes and routing (current vs planned)
 
-The backend is moving toward a mode router that composes decode modes and inference locations.
-Only one mode is implemented today, but the mode matrix defines the planned combinations.
+The backend is moving toward an Orchestrator model with a Scheduler and Fusion Engine that compose
+decode modes and inference locations. Only one mode is implemented today, but the mode matrix
+defines the planned combinations.
 
 Current implementation:
 

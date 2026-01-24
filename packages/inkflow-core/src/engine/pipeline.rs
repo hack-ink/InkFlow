@@ -13,7 +13,7 @@ use super::{
 	queue::SecondPassQueue,
 	render::RenderState,
 	modes::{DecodeMode, InferenceMode, PipelinePlan},
-	worker::{WhisperJob, spawn_asr_worker, spawn_whisper_worker},
+	worker::{SpeechActivity, WhisperJob, spawn_asr_worker, spawn_whisper_worker},
 };
 
 pub(crate) enum SttPipeline {
@@ -63,6 +63,7 @@ pub(crate) struct LocalStreamSecondPassPipeline {
 	raw_update_tx: mpsc::Sender<AsrUpdate>,
 	raw_update_rx: Mutex<mpsc::Receiver<AsrUpdate>>,
 	second_pass_queue: Arc<SecondPassQueue>,
+	speech_activity: Arc<SpeechActivity>,
 	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
 	asr_handle: Mutex<Option<tokio::task::JoinHandle<Result<(), AppError>>>>,
 	whisper_handle: tokio::task::JoinHandle<()>,
@@ -114,6 +115,7 @@ impl LocalStreamSecondPassPipeline {
 
 		let cancel = CancellationToken::new();
 		let engine_generation = 1;
+		let speech_activity = Arc::new(SpeechActivity::new());
 
 		let whisper_handle = spawn_whisper_worker(
 			runtime.handle(),
@@ -125,6 +127,7 @@ impl LocalStreamSecondPassPipeline {
 			window_profile,
 			raw_update_tx.clone(),
 			second_pass_queue.clone(),
+			speech_activity.clone(),
 			window_rx,
 		);
 
@@ -136,6 +139,7 @@ impl LocalStreamSecondPassPipeline {
 			raw_update_tx,
 			raw_update_rx: Mutex::new(raw_update_rx),
 			second_pass_queue,
+			speech_activity,
 			window_tx,
 			asr_handle: Mutex::new(None),
 			whisper_handle,
@@ -295,6 +299,7 @@ impl LocalStreamSecondPassPipeline {
 			audio_rx,
 			self.raw_update_tx.clone(),
 			self.second_pass_queue.clone(),
+			self.speech_activity.clone(),
 			self.window_tx.clone(),
 			self.window_enabled,
 		);

@@ -1,3 +1,5 @@
+mod logging;
+
 use std::{
 	ffi::CString,
 	os::raw::{c_char, c_void},
@@ -47,13 +49,14 @@ pub struct InkFlowHandle {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn inkflow_engine_create() -> *mut InkFlowHandle {
+	logging::init();
 	match InkFlowEngine::start(SttSettings::default()) {
 		Ok(engine) => Box::into_raw(Box::new(InkFlowHandle {
 			engine: Arc::new(Mutex::new(Some(engine))),
 			callback: Mutex::new(None),
 		})),
 		Err(err) => {
-			eprintln!("InkFlow engine initialization failed: {}.", err.message);
+			tracing::error!(error = %err.message, "InkFlow engine initialization failed.");
 			ptr::null_mut()
 		},
 	}
@@ -72,14 +75,14 @@ pub extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
 	let mut guard = match engine.lock() {
 		Ok(guard) => guard,
 		Err(_) => {
-			eprintln!("InkFlow engine lock poisoned during shutdown.");
+			tracing::error!("InkFlow engine lock poisoned during shutdown.");
 			return;
 		},
 	};
 
 	if let Some(engine) = guard.take() {
 		if let Err(err) = engine.stop() {
-			eprintln!("InkFlow engine shutdown failed: {}.", err.message);
+			tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
 		}
 	}
 }

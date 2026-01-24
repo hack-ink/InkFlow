@@ -44,6 +44,12 @@ pub struct InkFlowEngine {
 impl InkFlowEngine {
 	pub fn start(stt_settings: SttSettings) -> Result<Self, AppError> {
 		let plan = ModeRouter::resolve(&stt_settings);
+		tracing::info!(
+			decode_mode = ?plan.decode_mode,
+			inference = ?plan.inference,
+			window_enabled = plan.window_enabled,
+			"STT pipeline initialized."
+		);
 		let pipeline = SttPipeline::start(plan, stt_settings)?;
 		Ok(Self { pipeline })
 	}

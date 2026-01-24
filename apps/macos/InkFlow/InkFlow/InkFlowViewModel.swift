@@ -16,9 +16,6 @@ final class InkFlowViewModel: ObservableObject {
 
 	private let audioCapture = AudioCapture()
 	private let client: InkFlowClient?
-	private var segments: [String] = []
-	private var segmentIndex: [UInt64: Int] = [:]
-	private var liveText: String = ""
 	private var lastWaveformUpdate: TimeInterval = 0
 	private var lastWaveformLevel: CGFloat = InkFlowViewModel.waveformFloor
 	private let waveformUpdateInterval: TimeInterval = 0.02
@@ -73,9 +70,6 @@ final class InkFlowViewModel: ObservableObject {
 	}
 
 	func clear() {
-		segments.removeAll()
-		segmentIndex.removeAll()
-		liveText = ""
 		transcript = ""
 		errorMessage = nil
 		resetWaveform()
@@ -130,45 +124,22 @@ final class InkFlowViewModel: ObservableObject {
 	private func handleUpdate(_ update: InkFlowUpdate) {
 		switch update.kind {
 		case "live_render":
-			liveText = update.text ?? ""
+			transcript = update.text ?? ""
 		case "sherpa_partial":
 			break
 		case "window_result":
 			break
 		case "segment_end":
-			let text = update.text ?? ""
-			let segmentId = update.segmentId ?? UInt64(segments.count + 1)
-			segmentIndex[segmentId] = segments.count
-			segments.append(text)
-			liveText = ""
+			break
 		case "second_pass":
-			let text = update.text ?? ""
-			if let segmentId = update.segmentId, let index = segmentIndex[segmentId] {
-				if index < segments.count {
-					segments[index] = text
-				}
-			}
+			break
 		case "endpoint_reset":
-			liveText = ""
+			break
 		case "error":
 			status = "Backend error"
 			errorMessage = update.message ?? "An unknown error occurred."
 		default:
 			break
-		}
-
-		updateTranscript()
-	}
-
-	private func updateTranscript() {
-		let committed = segments.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-		let live = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
-		if committed.isEmpty {
-			transcript = live
-		} else if live.isEmpty {
-			transcript = committed
-		} else {
-			transcript = committed + " " + live
 		}
 	}
 

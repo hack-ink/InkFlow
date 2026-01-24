@@ -1,7 +1,7 @@
 use std::{
 	collections::hash_map::DefaultHasher,
 	hash::{Hash, Hasher},
-	sync::Arc,
+	sync::{Arc, atomic::{AtomicU64, Ordering}},
 	time::Duration,
 };
 
@@ -22,6 +22,36 @@ pub(crate) enum WhisperJob {
 	Window { snapshot: stt::WindowJobSnapshot, audio_16k: Vec<f32> },
 }
 
+pub(crate) struct SpeechActivity {
+	start: std::time::Instant,
+	last_ms: AtomicU64,
+}
+
+impl SpeechActivity {
+	pub(crate) fn new() -> Self {
+		Self {
+			start: std::time::Instant::now(),
+			last_ms: AtomicU64::new(0),
+		}
+	}
+
+	pub(crate) fn mark(&self) {
+		let now_ms = self.start.elapsed().as_millis() as u64;
+		self.last_ms.store(now_ms, Ordering::Relaxed);
+	}
+
+	pub(crate) fn is_recent(&self, window_activity_ms: u64) -> bool {
+		let last = self.last_ms.load(Ordering::Relaxed);
+		if last == 0 {
+			return false;
+		}
+
+		let now_ms = self.start.elapsed().as_millis() as u64;
+		let hold_ms = window_activity_ms.saturating_mul(3).max(200);
+		now_ms.saturating_sub(last) <= hold_ms
+	}
+}
+
 struct WhisperWorker {
 	cancel: CancellationToken,
 	whisper_config: stt::WhisperConfig,
@@ -33,6 +63,8 @@ struct WhisperWorker {
 	second_pass_queue: Arc<SecondPassQueue>,
 	window_rx: std::sync::mpsc::Receiver<WhisperJob>,
 	window_cache: Option<WindowDecodeCache>,
+	window_gate_blocked: bool,
+	speech_activity: Arc<SpeechActivity>,
 }
 
 impl WhisperWorker {
@@ -46,7 +78,7 @@ impl WhisperWorker {
 				return;
 			}
 
-			self.drain_second_pass(&gate);
+			self.drain_second_pass();
 
 			if self.cancel.is_cancelled() {
 				return;
@@ -64,8 +96,26 @@ impl WhisperWorker {
 
 					let start = audio_16k.len().saturating_sub(window_activity_samples_16k.max(1));
 					let metrics = activity_metrics(&audio_16k[start..], 16_000);
-					if !gate.allows(&metrics) {
+					if !self.speech_activity.is_recent(window_activity_ms) && !gate.allows(&metrics) {
+						if !self.window_gate_blocked {
+							self.window_gate_blocked = true;
+							tracing::debug!(
+								mean_abs = metrics.mean_abs,
+								rms = metrics.rms,
+								zero_crossing_rate = metrics.zero_crossing_rate,
+								band_energy_ratio = metrics.band_energy_ratio,
+								min_mean_abs = gate.min_mean_abs,
+								min_rms = gate.min_rms,
+								max_zero_crossing_rate = gate.max_zero_crossing_rate,
+								min_band_energy_ratio = gate.min_band_energy_ratio,
+								"Window activity gate suppressed decoding."
+							);
+						}
 						continue;
+					}
+					if self.window_gate_blocked {
+						self.window_gate_blocked = false;
+						tracing::debug!("Window activity gate resumed decoding.");
 					}
 
 					let hash = audio_hash(&audio_16k);
@@ -97,7 +147,10 @@ impl WhisperWorker {
 								.blocking_send(AsrUpdate::WindowResult { snapshot, result });
 						},
 						Err(err) => {
-							eprintln!("Whisper window transcription failed: {}.", err.message);
+							tracing::error!(
+								error = %err.message,
+								"Whisper window transcription failed."
+							);
 						},
 					}
 				},
@@ -108,7 +161,7 @@ impl WhisperWorker {
 		}
 	}
 
-	fn drain_second_pass(&self, gate: &ActivityGate) {
+	fn drain_second_pass(&mut self) {
 		loop {
 			let Some(job) =
 				self.second_pass_queue.pop(Duration::from_millis(1))
@@ -129,29 +182,38 @@ impl WhisperWorker {
 				continue;
 			}
 
+			tracing::debug!(
+				segment_id,
+				samples = samples.len(),
+				"Second-pass dequeued."
+			);
+
 			let audio_16k = stt::resample_linear_to_16k(&samples, sample_rate_hz);
-			let metrics = activity_metrics(&audio_16k, 16_000);
-			if !gate.allows_with_peak(&metrics, peak_mean_abs) {
-				continue;
-			}
-			match stt::transcribe(
+			match stt::transcribe_segments(
 				self.whisper_ctx.as_ref(),
 				&audio_16k,
 				&self.whisper_config,
 				self.second_pass_profile,
 			) {
-				Ok(text) => {
-					let text = text.trim().to_string();
+				Ok(result) => {
+					let text = result.text.trim().to_string();
 					if text.is_empty() {
+						tracing::debug!(segment_id, "Second-pass returned empty text.");
 						continue;
 					}
 					let _ =
 						self.update_tx.blocking_send(AsrUpdate::SecondPass { segment_id, text });
+					tracing::info!(
+						segment_id,
+						peak_mean_abs,
+						"Second-pass transcription delivered."
+					);
 				},
 				Err(err) => {
-					eprintln!(
-						"Whisper second-pass transcription failed for segment {}: {}.",
-						segment_id, err.message
+					tracing::error!(
+						segment_id,
+						error = %err.message,
+						"Whisper second-pass transcription failed."
 					);
 				},
 			}
@@ -169,16 +231,19 @@ struct StreamWorker {
 	audio_rx: mpsc::Receiver<Vec<f32>>,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_queue: Arc<SecondPassQueue>,
+	speech_activity: Arc<SpeechActivity>,
 	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
 	window_state: WindowState,
 	segment_state: SegmentState,
 	last_text: String,
 	samples_per_read: usize,
-	pending_second_pass: Option<PendingSecondPass>,
+	second_pass: SecondPassScheduler,
+	last_window_backpressure: bool,
 }
 
 struct PendingSecondPass {
 	segment_id: u64,
+	sample_rate_hz: u32,
 	samples: Vec<f32>,
 	peak_mean_abs: f32,
 	remaining_tail_samples: usize,
@@ -194,6 +259,78 @@ impl PendingSecondPass {
 		self.samples.extend_from_slice(&samples[..take]);
 		self.remaining_tail_samples = self.remaining_tail_samples.saturating_sub(take);
 		self.remaining_tail_samples == 0
+	}
+
+	fn into_job(self) -> WhisperJob {
+		WhisperJob::SecondPass {
+			segment_id: self.segment_id,
+			sample_rate_hz: self.sample_rate_hz,
+			samples: self.samples,
+			peak_mean_abs: self.peak_mean_abs,
+		}
+	}
+}
+
+struct SecondPassScheduler {
+	pending: Option<PendingSecondPass>,
+}
+
+impl SecondPassScheduler {
+	fn new() -> Self {
+		Self { pending: None }
+	}
+
+	fn schedule(
+		&mut self,
+		segment_id: u64,
+		sample_rate_hz: u32,
+		samples: Vec<f32>,
+		peak_mean_abs: f32,
+		tail_samples: usize,
+	) -> Option<WhisperJob> {
+		if tail_samples == 0 {
+			return Some(WhisperJob::SecondPass {
+				segment_id,
+				sample_rate_hz,
+				samples,
+				peak_mean_abs,
+			});
+		}
+
+		self.pending = Some(PendingSecondPass {
+			segment_id,
+			sample_rate_hz,
+			samples,
+			peak_mean_abs,
+			remaining_tail_samples: tail_samples,
+		});
+		None
+	}
+
+	fn append_tail(&mut self, _samples: &[f32]) -> Option<WhisperJob> {
+		let Some(mut pending) = self.pending.take() else {
+			return None;
+		};
+
+		if !pending.append_tail(_samples) {
+			self.pending = Some(pending);
+			return None;
+		}
+
+		Some(pending.into_job())
+	}
+
+	fn flush(&mut self, _force: bool) -> Option<WhisperJob> {
+		let Some(pending) = self.pending.take() else {
+			return None;
+		};
+
+		if pending.remaining_tail_samples == 0 || _force {
+			return Some(pending.into_job());
+		}
+
+		self.pending = Some(pending);
+		None
 	}
 }
 
@@ -266,8 +403,20 @@ impl StreamWorker {
 		let text = result.text.trim().to_string();
 		self.maybe_emit_partial(&text);
 
-		let allow_windows = self.second_pass_queue.len()
-			< self.stt_settings.window.window_backpressure_high_watermark;
+		let queue_len = self.second_pass_queue.len();
+		let allow_windows = queue_len < self.stt_settings.window.window_backpressure_high_watermark;
+		let backpressure = !allow_windows;
+		if backpressure != self.last_window_backpressure {
+			if backpressure {
+				tracing::warn!(
+					queue_len,
+					"Window decoding suppressed due to second-pass backpressure."
+				);
+			} else {
+				tracing::info!("Window decoding resumed after backpressure.");
+			}
+			self.last_window_backpressure = backpressure;
+		}
 		for (snapshot, audio_16k) in self.window_state.drain_ready_jobs(
 			self.engine_generation,
 			!self.last_text.is_empty(),
@@ -295,12 +444,14 @@ impl StreamWorker {
 			return;
 		}
 
+		self.speech_activity.mark();
+		self.last_text = text.to_string();
+
 		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
 		if !has_voice {
 			return;
 		}
 
-		self.last_text = text.to_string();
 		let _ = self.update_tx.blocking_send(AsrUpdate::SherpaPartial(self.last_text.clone()));
 	}
 
@@ -327,6 +478,12 @@ impl StreamWorker {
 		});
 
 		let (segment_samples, peak_mean_abs) = self.segment_state.take();
+		tracing::info!(
+			segment_id,
+			samples = segment_samples.len(),
+			peak_mean_abs,
+			"Segment committed."
+		);
 		self.schedule_second_pass(segment_id, segment_samples, peak_mean_abs);
 
 		self.last_text.clear();
@@ -388,6 +545,12 @@ impl StreamWorker {
 		});
 
 		let (segment_samples, peak_mean_abs) = self.segment_state.take();
+		tracing::info!(
+			segment_id,
+			samples = segment_samples.len(),
+			peak_mean_abs,
+			"Segment committed."
+		);
 		self.schedule_second_pass(segment_id, segment_samples, peak_mean_abs);
 		self.flush_pending_second_pass(true);
 
@@ -395,12 +558,16 @@ impl StreamWorker {
 	}
 
 	fn append_pending_tail(&mut self, samples: &[f32]) {
-		let Some(pending) = self.pending_second_pass.as_mut() else {
-			return;
-		};
-
-		if pending.append_tail(samples) {
-			self.flush_pending_second_pass(true);
+		if let Some(job) = self.second_pass.append_tail(samples) {
+			if let WhisperJob::SecondPass {
+				segment_id,
+				sample_rate_hz,
+				samples,
+				peak_mean_abs,
+			} = job
+			{
+				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+			}
 		}
 	}
 
@@ -411,46 +578,59 @@ impl StreamWorker {
 		peak_mean_abs: f32,
 	) {
 		self.flush_pending_second_pass(true);
-
 		let tail_ms = self.stt_settings.window.endpoint_tail_ms;
 		let tail_samples = ms_to_samples(self.sample_rate, tail_ms);
-		if tail_samples == 0 {
-			self.enqueue_second_pass(segment_id, segment_samples, peak_mean_abs);
-			return;
-		}
-
-		self.pending_second_pass = Some(PendingSecondPass {
+		if let Some(job) = self.second_pass.schedule(
 			segment_id,
-			samples: segment_samples,
+			self.sample_rate,
+			segment_samples,
 			peak_mean_abs,
-			remaining_tail_samples: tail_samples,
-		});
+			tail_samples,
+		) {
+			if let WhisperJob::SecondPass {
+				segment_id,
+				sample_rate_hz,
+				samples,
+				peak_mean_abs,
+			} = job
+			{
+				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+			}
+		}
 	}
 
 	fn flush_pending_second_pass(&mut self, force: bool) {
-		let Some(pending) = self.pending_second_pass.take() else {
-			return;
-		};
-
-		if pending.remaining_tail_samples == 0 || force {
-			self.enqueue_second_pass(
-				pending.segment_id,
-				pending.samples,
-				pending.peak_mean_abs,
-			);
-			return;
+		if let Some(job) = self.second_pass.flush(force) {
+			if let WhisperJob::SecondPass {
+				segment_id,
+				sample_rate_hz,
+				samples,
+				peak_mean_abs,
+			} = job
+			{
+				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+			}
 		}
-
-		self.pending_second_pass = Some(pending);
 	}
 
-	fn enqueue_second_pass(&self, segment_id: u64, samples: Vec<f32>, peak_mean_abs: f32) {
-		let _ = self.second_pass_queue.push(WhisperJob::SecondPass {
+	fn enqueue_second_pass(
+		&self,
+		segment_id: u64,
+		sample_rate_hz: u32,
+		samples: Vec<f32>,
+		peak_mean_abs: f32,
+	) {
+		let accepted = self.second_pass_queue.push(WhisperJob::SecondPass {
 			segment_id,
-			sample_rate_hz: self.sample_rate,
+			sample_rate_hz,
 			samples,
 			peak_mean_abs,
 		});
+		if accepted {
+			tracing::debug!(segment_id, "Second-pass enqueued.");
+		} else {
+			tracing::warn!(segment_id, "Second-pass enqueue dropped.");
+		}
 	}
 }
 
@@ -499,14 +679,34 @@ impl ActivityGate {
 	}
 
 	fn allows(&self, metrics: &ActivityMetrics) -> bool {
-		metrics.mean_abs >= self.min_mean_abs
-			&& metrics.rms >= self.min_rms
-			&& metrics.zero_crossing_rate <= self.max_zero_crossing_rate
-			&& metrics.band_energy_ratio >= self.min_band_energy_ratio
-	}
+		let noise_ok = metrics.zero_crossing_rate <= self.max_zero_crossing_rate;
+		if !noise_ok {
+			return false;
+		}
 
-	fn allows_with_peak(&self, metrics: &ActivityMetrics, peak_mean_abs: f32) -> bool {
-		peak_mean_abs >= self.min_mean_abs && self.allows(metrics)
+		let energy_ok = metrics.mean_abs >= self.min_mean_abs && metrics.rms >= self.min_rms;
+		let energy_relaxed = metrics.mean_abs >= self.min_mean_abs * 0.6
+			&& metrics.rms >= self.min_rms * 0.6;
+		if !energy_ok && !energy_relaxed {
+			return false;
+		}
+
+		if self.min_band_energy_ratio <= 0.0 {
+			return true;
+		}
+
+		const ENERGY_BOOST: f32 = 1.5;
+		const ZCR_RELAX_FACTOR: f32 = 0.8;
+
+		let mean_boost = self.min_mean_abs > 0.0
+			&& metrics.mean_abs >= self.min_mean_abs * ENERGY_BOOST;
+		let rms_boost = self.min_rms > 0.0
+			&& metrics.rms >= self.min_rms * ENERGY_BOOST;
+		let band_ok = metrics.band_energy_ratio >= self.min_band_energy_ratio;
+		let low_noise =
+			metrics.zero_crossing_rate <= self.max_zero_crossing_rate * ZCR_RELAX_FACTOR;
+
+		band_ok || (low_noise && energy_relaxed) || mean_boost || rms_boost
 	}
 }
 
@@ -587,6 +787,8 @@ fn band_energy_ratio(samples: &[f32], sample_rate_hz: u32) -> f32 {
 #[cfg(test)]
 mod activity_tests {
 	use super::activity_metrics;
+	use super::{ActivityGate, ActivityMetrics};
+	use crate::settings::SttSettings;
 
 	#[test]
 	fn activity_metrics_detects_silence() {
@@ -606,6 +808,32 @@ mod activity_tests {
 		let metrics = activity_metrics(&samples, 16_000);
 		assert!(metrics.zero_crossing_rate > 0.4);
 	}
+
+	#[test]
+	fn activity_gate_allows_high_energy_even_with_low_band_ratio() {
+		let settings = SttSettings::default();
+		let gate = ActivityGate::new(&settings.window);
+		let metrics = ActivityMetrics {
+			mean_abs: settings.window.min_mean_abs * 2.0,
+			rms: settings.window.min_rms * 2.0,
+			zero_crossing_rate: settings.window.max_zero_crossing_rate * 0.5,
+			band_energy_ratio: settings.window.min_band_energy_ratio * 0.5,
+		};
+		assert!(gate.allows(&metrics));
+	}
+
+	#[test]
+	fn activity_gate_allows_low_noise_with_low_band_ratio() {
+		let settings = SttSettings::default();
+		let gate = ActivityGate::new(&settings.window);
+		let metrics = ActivityMetrics {
+			mean_abs: settings.window.min_mean_abs * 1.1,
+			rms: settings.window.min_rms * 1.1,
+			zero_crossing_rate: settings.window.max_zero_crossing_rate * 0.2,
+			band_energy_ratio: settings.window.min_band_energy_ratio * 0.1,
+		};
+		assert!(gate.allows(&metrics));
+	}
 }
 
 #[cfg(test)]
@@ -616,6 +844,7 @@ mod pending_tests {
 	fn pending_second_pass_appends_tail_until_complete() {
 		let mut pending = PendingSecondPass {
 			segment_id: 1,
+			sample_rate_hz: 16_000,
 			samples: vec![0.1; 4],
 			peak_mean_abs: 0.1,
 			remaining_tail_samples: 4,
@@ -630,6 +859,49 @@ mod pending_tests {
 	}
 }
 
+#[cfg(test)]
+mod second_pass_scheduler_tests {
+	use super::{SecondPassScheduler, WhisperJob};
+
+	#[test]
+	fn schedule_defers_until_tail_complete() {
+		let mut scheduler = SecondPassScheduler::new();
+		let scheduled = scheduler.schedule(1, 16_000, vec![0.1; 4], 0.2, 3);
+		assert!(scheduled.is_none());
+
+		let appended = scheduler.append_tail(&[0.2, 0.2]);
+		assert!(appended.is_none());
+
+		let appended = scheduler.append_tail(&[0.3]);
+		let WhisperJob::SecondPass { samples, .. } =
+			appended.expect("expected second-pass job after tail")
+		else {
+			panic!("expected second-pass job");
+		};
+		assert_eq!(samples.len(), 7);
+	}
+
+	#[test]
+	fn flush_forces_enqueue_when_tail_remaining() {
+		let mut scheduler = SecondPassScheduler::new();
+		let scheduled = scheduler.schedule(2, 16_000, vec![0.1; 2], 0.2, 5);
+		assert!(scheduled.is_none());
+
+		let flushed = scheduler.flush(true);
+		assert!(matches!(flushed, Some(WhisperJob::SecondPass { .. })));
+
+		let appended = scheduler.append_tail(&[0.2, 0.2]);
+		assert!(appended.is_none());
+	}
+
+	#[test]
+	fn schedule_immediate_when_no_tail() {
+		let mut scheduler = SecondPassScheduler::new();
+		let scheduled = scheduler.schedule(3, 16_000, vec![0.1; 3], 0.2, 0);
+		assert!(matches!(scheduled, Some(WhisperJob::SecondPass { .. })));
+	}
+}
+
 pub(crate) fn spawn_whisper_worker(
 	handle: &tokio::runtime::Handle,
 	cancel: CancellationToken,
@@ -640,6 +912,7 @@ pub(crate) fn spawn_whisper_worker(
 	window_profile: stt::WhisperDecodeProfile,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_queue: Arc<SecondPassQueue>,
+	speech_activity: Arc<SpeechActivity>,
 	window_rx: std::sync::mpsc::Receiver<WhisperJob>,
 ) -> tokio::task::JoinHandle<()> {
 	let worker = WhisperWorker {
@@ -651,8 +924,10 @@ pub(crate) fn spawn_whisper_worker(
 		window_profile,
 		update_tx,
 		second_pass_queue,
+		speech_activity,
 		window_rx,
 		window_cache: None,
+		window_gate_blocked: false,
 	};
 
 	handle.spawn_blocking(move || worker.run())
@@ -670,6 +945,7 @@ pub(crate) fn spawn_asr_worker(
 	audio_rx: mpsc::Receiver<Vec<f32>>,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_queue: Arc<SecondPassQueue>,
+	speech_activity: Arc<SpeechActivity>,
 	window_tx: std::sync::mpsc::SyncSender<WhisperJob>,
 	window_enabled: bool,
 ) -> tokio::task::JoinHandle<Result<(), AppError>> {
@@ -691,12 +967,14 @@ pub(crate) fn spawn_asr_worker(
 			audio_rx,
 			update_tx,
 			second_pass_queue,
+			speech_activity,
 			window_tx,
 			window_state,
 			segment_state,
 			last_text: String::new(),
 			samples_per_read,
-			pending_second_pass: None,
+			second_pass: SecondPassScheduler::new(),
+			last_window_backpressure: false,
 		};
 
 		worker.run()

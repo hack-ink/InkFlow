@@ -24,13 +24,23 @@ Scope: Platform targets, frameworks, speech-to-text architecture, session model,
 - `packages/inkflow-ffi` exposes a stable C ABI and delivers updates via callbacks.
 - The SwiftUI app must treat the Rust engine as the source of truth for transcript updates.
 
+## Logging and diagnostics
+
+- Rust uses tracing with a file-only subscriber initialized in `packages/inkflow-ffi`.
+- Default log location (macOS): `~/Library/Application Support/ink.hack.InkFlow/logs/`.
+- Log files rotate daily (`inkflow.log.YYYY-MM-DD`).
+- Log level is controlled by `RUST_LOG`; no custom InkFlow log environment variable is required.
+- Console output is disabled by default to keep the GUI app clean.
+
 ## Speech-to-text architecture (summary)
 
 - Streaming partials and endpoints: sherpa-onnx streaming ASR (Zipformer-Transducer).
 - Live refinement: Whisper sliding-window decoding in parallel during dictation.
 - Finalization: Whisper second-pass decoding per endpoint segment replaces provisional sherpa text.
 - Single Whisper context instance per process.
+- Target orchestration: Orchestrator + Scheduler + Fusion Engine producing `RenderUpdate` for the UI.
 - Canonical specification: `docs/spec/core/stt_dictation_pipeline.md`.
+- Target architecture reference: `docs/spec/core/stt_orchestrator_architecture.md`.
 
 ## STT modes and routing (current vs planned)
 

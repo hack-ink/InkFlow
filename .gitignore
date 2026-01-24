@@ -26,6 +26,7 @@ target
 ## Swift
 xcuserdata
 .build
+.derived-data
 
 # System
 .DS_Store

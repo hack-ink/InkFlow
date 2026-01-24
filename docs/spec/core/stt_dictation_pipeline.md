@@ -14,6 +14,8 @@ This document is a single, comprehensive specification of InkFlow's dictation ST
 
 This spec is implementation-oriented and code-referenced. The code remains the source of truth, and this document must be updated when behavior changes.
 
+Target orchestration context lives in `docs/spec/core/stt_orchestrator_architecture.md`.
+
 ---
 
 ## Goals and non-goals

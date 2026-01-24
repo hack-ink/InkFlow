@@ -24,6 +24,10 @@ impl MergeState {
 		self.recent.clear();
 	}
 
+	pub fn stable_len(&self) -> usize {
+		self.stable.len()
+	}
+
 	pub fn apply_candidate(
 		&mut self,
 		candidate_text: &str,

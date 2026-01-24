@@ -80,19 +80,28 @@ Common shape:
 }
 ```
 
-#### `live_render`
+#### `render_update` (emitted as `live_render`)
 
 ```json
 { "kind": "live_render", "text": "backend-stabilized live text" }
 ```
 
+This is the only UI-rendered payload. The `text` field is the user-facing display string
+(`display_text` in the orchestration spec). It contains the full transcript (committed
+segments plus the live tail). When present, `segments_delta` communicates a replacement or
+insertion for committed segment history views.
+
 #### `sherpa_partial` (diagnostic)
+
+Diagnostic-only. The UI must not render this payload.
 
 ```json
 { "kind": "sherpa_partial", "text": "raw sherpa partial" }
 ```
 
 #### `window_result` (diagnostic)
+
+Diagnostic-only. The UI must not render this payload.
 
 ```json
 {
@@ -127,13 +136,17 @@ Common shape:
 }
 ```
 
-#### `second_pass`
+#### `second_pass` (diagnostic)
+
+Diagnostic-only. The UI must not render this payload.
 
 ```json
 { "kind": "second_pass", "segment_id": 5, "text": "whisper replacement" }
 ```
 
 #### `endpoint_reset`
+
+Diagnostic-only. The UI should not render or clear state from this payload.
 
 ```json
 { "kind": "endpoint_reset", "window_generation_after": 5 }

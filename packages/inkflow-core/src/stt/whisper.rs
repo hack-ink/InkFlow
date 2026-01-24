@@ -253,7 +253,8 @@ fn build_decode_params(
 
 	let language = config.language.as_str();
 	if language == "auto" {
-		params.set_detect_language(true);
+		params.set_detect_language(false);
+		params.set_language(None);
 	} else {
 		params.set_detect_language(false);
 		params.set_language(Some(language));

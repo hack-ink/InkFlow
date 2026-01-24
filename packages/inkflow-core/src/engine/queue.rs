@@ -1,7 +1,7 @@
 use std::{
 	collections::VecDeque,
 	sync::{Condvar, Mutex},
-	time::Duration,
+	time::{Duration, Instant},
 };
 
 use super::worker::WhisperJob;
@@ -10,6 +10,7 @@ pub(crate) struct SecondPassQueue {
 	capacity: usize,
 	inner: Mutex<VecDeque<WhisperJob>>,
 	available: Condvar,
+	drop_log: Mutex<DropLogState>,
 }
 
 impl SecondPassQueue {
@@ -18,36 +19,42 @@ impl SecondPassQueue {
 			capacity: capacity.max(1),
 			inner: Mutex::new(VecDeque::with_capacity(capacity.max(1))),
 			available: Condvar::new(),
+			drop_log: Mutex::new(DropLogState::new()),
 		}
 	}
 
 	pub(crate) fn push(&self, job: WhisperJob) -> bool {
-		let mut queue = self.inner.lock().unwrap_or_else(|err| err.into_inner());
+		let (accepted, drop_reason, drop_queue_len) = {
+			let mut queue = self.inner.lock().unwrap_or_else(|err| err.into_inner());
 
-		if queue.len() < self.capacity {
-			queue.push_back(job);
-			self.available.notify_one();
-			return true;
-		}
+			if queue.len() < self.capacity {
+				queue.push_back(job);
+				self.available.notify_one();
+				return true;
+			}
 
-		let new_peak = peak_mean_abs(&job);
-		let Some((drop_index, drop_peak)) = queue
-			.iter()
-			.enumerate()
-			.filter_map(|(idx, item)| Some((idx, peak_mean_abs(item))))
-			.min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-		else {
-			return false;
+			let new_peak = peak_mean_abs(&job);
+			let Some((drop_index, drop_peak)) = queue
+				.iter()
+				.enumerate()
+				.filter_map(|(idx, item)| Some((idx, peak_mean_abs(item))))
+				.min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+			else {
+				return false;
+			};
+
+			if new_peak <= drop_peak {
+				(false, "incoming_low_energy", queue.len())
+			} else {
+				queue.remove(drop_index);
+				queue.push_back(job);
+				self.available.notify_one();
+				(true, "replaced_low_energy", queue.len())
+			}
 		};
 
-		if new_peak <= drop_peak {
-			return false;
-		}
-
-		queue.remove(drop_index);
-		queue.push_back(job);
-		self.available.notify_one();
-		true
+		self.record_drop(drop_reason, drop_queue_len);
+		accepted
 	}
 
 	pub(crate) fn pop(&self, timeout: Duration) -> Option<WhisperJob> {
@@ -68,12 +75,51 @@ impl SecondPassQueue {
 		let queue = self.inner.lock().unwrap_or_else(|err| err.into_inner());
 		queue.len()
 	}
+
+	fn record_drop(&self, reason: &'static str, queue_len: usize) {
+		let mut state = self.drop_log.lock().unwrap_or_else(|err| err.into_inner());
+		state.dropped = state.dropped.saturating_add(1);
+
+		let now = Instant::now();
+		if now.duration_since(state.last_log) < state.interval {
+			return;
+		}
+
+		tracing::warn!(
+			dropped = state.dropped,
+			queue_len,
+			reason,
+			"Second-pass queue dropped segments."
+		);
+		state.dropped = 0;
+		state.last_log = now;
+	}
 }
 
 fn peak_mean_abs(job: &WhisperJob) -> f32 {
 	match job {
 		WhisperJob::SecondPass { peak_mean_abs, .. } => *peak_mean_abs,
 		WhisperJob::Window { .. } => 0.0,
+	}
+}
+
+struct DropLogState {
+	last_log: Instant,
+	interval: Duration,
+	dropped: u64,
+}
+
+impl DropLogState {
+	fn new() -> Self {
+		let now = Instant::now();
+		let last_log = now
+			.checked_sub(Duration::from_secs(60))
+			.unwrap_or(now);
+		Self {
+			last_log,
+			interval: Duration::from_secs(2),
+			dropped: 0,
+		}
 	}
 }
 
