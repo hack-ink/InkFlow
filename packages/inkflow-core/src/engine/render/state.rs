@@ -4,12 +4,12 @@ use std::{
 };
 
 use crate::{AsrUpdate, domain, settings::SttSettings, stt};
+use crate::engine::text;
 
-use super::text;
+use super::helpers::{render_preview, window_tail_text};
 
 pub(crate) struct RenderState {
 	merge: domain::MergeState,
-	last_window_text: String,
 	last_window_end_16k: u64,
 	committed_end_16k: u64,
 	current_window_generation: u64,
@@ -28,12 +28,11 @@ pub(crate) struct RenderState {
 
 impl RenderState {
 	pub(crate) fn new() -> Self {
-		Self {
-			merge: domain::MergeState::default(),
-			last_window_text: String::new(),
-			last_window_end_16k: 0,
-			committed_end_16k: 0,
-			current_window_generation: 0,
+			Self {
+				merge: domain::MergeState::default(),
+				last_window_end_16k: 0,
+				committed_end_16k: 0,
+				current_window_generation: 0,
 			last_window_update: None,
 			last_sherpa_partial: String::new(),
 			live_tail: String::new(),
@@ -81,8 +80,9 @@ impl RenderState {
 				}
 
 				let mode = domain::token_mode_for_language("auto", &tail);
+				let committed_text = self.compose_committed_text();
 				let deduped = domain::dedup_tail(
-					&self.last_window_text,
+					&committed_text,
 					&tail,
 					mode,
 					settings.merge.overlap_k_words as usize,
@@ -104,7 +104,6 @@ impl RenderState {
 					|| stable_advanced
 					|| self.window_tick.saturating_sub(self.last_emit_tick) >= interval;
 
-				self.last_window_text = deduped;
 				self.last_window_end_16k = snapshot.window_end_16k_samples;
 				self.last_window_update = Some(Instant::now());
 				self.has_window_output = true;
@@ -146,7 +145,6 @@ impl RenderState {
 				self.current_window_generation = *window_generation_after;
 				self.last_window_end_16k = *committed_end_16k_samples;
 				self.merge.reset();
-				self.last_window_text.clear();
 				self.last_sherpa_partial.clear();
 				self.last_window_update = None;
 				self.live_tail.clear();
@@ -159,7 +157,6 @@ impl RenderState {
 			AsrUpdate::EndpointReset { window_generation_after } => {
 				self.current_window_generation = *window_generation_after;
 				self.merge.reset();
-				self.last_window_text.clear();
 				self.last_sherpa_partial.clear();
 				self.last_window_update = None;
 				self.live_tail.clear();
@@ -176,9 +173,10 @@ impl RenderState {
 				}
 				let &index = self.segment_index.get(segment_id)?;
 				if let Some(existing) = self.last_second_pass_text.get(segment_id)
-					&& existing == incoming {
-						return None;
-					}
+					&& existing == incoming
+				{
+					return None;
+				}
 				let current = self.committed_segments.get(index).map(String::as_str).unwrap_or("");
 				let mode = domain::token_mode_for_language("auto", incoming);
 				if !domain::should_accept_second_pass_replacement(current, incoming, mode) {
@@ -255,50 +253,19 @@ impl RenderState {
 		update
 	}
 
-	fn compose_display_text(&self) -> String {
+	fn compose_committed_text(&self) -> String {
 		let mut out = String::new();
 		for segment in &self.committed_segments {
 			text::append_normalized(&mut out, segment);
 		}
+		out
+	}
+
+	fn compose_display_text(&self) -> String {
+		let mut out = self.compose_committed_text();
 		text::append_normalized(&mut out, &self.live_tail);
 		out
 	}
-}
-
-fn window_tail_text(
-	snapshot: &stt::WindowJobSnapshot,
-	result: &stt::WhisperDecodeResult,
-	committed_end_16k: u64,
-) -> String {
-	let window_start_16k =
-		snapshot.window_end_16k_samples.saturating_sub(snapshot.window_len_16k_samples as u64);
-	let mut out = String::new();
-
-	for segment in &result.segments {
-		let end = window_start_16k.saturating_add(domain::ms_to_samples_16k(segment.t1_ms));
-		if end <= committed_end_16k {
-			continue;
-		}
-		text::append_normalized(&mut out, &segment.text);
-	}
-
-	out
-}
-
-fn render_preview(text: &str, max_chars: usize) -> String {
-	if max_chars == 0 {
-		return String::new();
-	}
-
-	let mut out = String::new();
-	for (idx, ch) in text.chars().enumerate() {
-		if idx >= max_chars {
-			out.push('…');
-			break;
-		}
-		out.push(ch);
-	}
-	out
 }
 
 #[cfg(test)]
@@ -402,18 +369,16 @@ mod tests {
 			has_timestamps: true,
 		};
 
-		let mut out = None;
+		let initial_stable = state.merge.stable_len();
 		for _ in 0..settings.merge.stable_ticks {
-			out = state.handle_update(
+			state.handle_update(
 				&AsrUpdate::WindowResult { snapshot: snapshot.clone(), result: result.clone() },
 				&settings,
 			);
 		}
 
-		let AsrUpdate::LiveRender { text } = out.expect("live render update expected") else {
-			panic!("expected live render update");
-		};
-		assert!(!text.is_empty());
+		assert!(state.merge.stable_len() > initial_stable);
+		assert!(!state.live_tail.is_empty());
 	}
 
 	#[test]

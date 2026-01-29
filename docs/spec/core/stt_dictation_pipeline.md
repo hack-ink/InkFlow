@@ -103,7 +103,7 @@ The SwiftUI app controls dictation explicitly:
 
 Backend is the single source of truth for transcript updates and timing.
 
-Code anchor: `apps/macos/InkFlow/InkFlow/ContentView.swift`, `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkflow-ffi/src/lib.rs`.
+Code anchor: `apps/macos/InkFlow/InkFlow/UI/Panel/Root/PanelRootView.swift`, `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkflow-ffi/src/api.rs`.
 
 ### 1.3 Finalization Must Capture the Last Words (Forced Finalize)
 
@@ -188,7 +188,7 @@ Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkf
 - Receives audio buffers, manages sherpa streaming, and schedules Whisper work.
 - Emits JSON update events via the FFI layer.
 - Maintains segment and window state required for refinement and finalization.
-- Live render/merge state: `packages/inkflow-core/src/engine/render.rs`.
+- Live render/merge state: `packages/inkflow-core/src/engine/render/state.rs`.
 - Second-pass queue and backpressure: `packages/inkflow-core/src/engine/queue.rs`.
 
 ### 3.3 Audio Capture
@@ -200,8 +200,8 @@ Code anchor: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`, `packages/inkf
 
 ### 3.4 STT Wrappers and Configuration
 
-- Sherpa: `packages/inkflow-core/src/stt.rs`.
-- Whisper: `packages/inkflow-core/src/stt/whisper.rs`.
+- Sherpa: `packages/inkflow-core/src/stt/sherpa.rs`.
+- Whisper: `packages/inkflow-core/src/stt/whisper/`.
 
 ### 3.5 Engine Manager + Settings (v2 required)
 
@@ -504,14 +504,14 @@ Env-gated or settings-gated logs (no absolute paths):
 
 ## 11. Reference Code Locations
 
-- UI: `apps/macos/InkFlow/InkFlow/ContentView.swift`
+- UI: `apps/macos/InkFlow/InkFlow/UI/Panel/Root/PanelRootView.swift`
 - UI state and callbacks: `apps/macos/InkFlow/InkFlow/InkFlowViewModel.swift`
-- FFI bridge: `packages/inkflow-ffi/src/lib.rs`
+- FFI bridge: `packages/inkflow-ffi/src/api.rs`
 - Mic capture: `apps/macos/InkFlow/InkFlow/AudioCapture.swift`
-- Sherpa: `packages/inkflow-core/src/stt.rs`.
-- Whisper: `packages/inkflow-core/src/stt/whisper.rs`.
+- Sherpa: `packages/inkflow-core/src/stt/sherpa.rs`.
+- Whisper: `packages/inkflow-core/src/stt/whisper/`.
 - Harness: `research/stt_compare/...`
-- Settings: `packages/inkflow-core/src/settings.rs`
+- Settings: `packages/inkflow-core/src/settings/mod.rs`
 - Engine: `packages/inkflow-core/src/engine.rs`
 - Implementation notes: `docs/guide/development/stt_dictation_pipeline_impl_notes.md`
 

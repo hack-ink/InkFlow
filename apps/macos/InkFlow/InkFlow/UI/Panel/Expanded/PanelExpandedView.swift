@@ -25,21 +25,16 @@ struct PanelExpandedView: View {
 		.tint(appearance.accentColor)
 		.onExitCommand { panelController.handleExitCommand() }
 		.animation(
-			.easeInOut(duration: UIDuration.panelSettingsToggle), value: panelController.isSettingsPresented
+			.easeInOut(duration: UIDuration.panelSettingsToggle),
+			value: panelController.isSettingsPresented
 		)
 	}
 
 	private var settingsAccessory: some View {
-		Button(action: panelController.toggleSettings) {
-			Image(systemName: "slider.horizontal.3")
-				.font(.system(size: 12, weight: .semibold))
-				.foregroundStyle(panelController.isSettingsPresented ? Color.primary : Color.secondary)
-				.frame(
-					width: PanelExpandedLayout.settingsButtonSize,
-					height: PanelExpandedLayout.settingsButtonSize)
-		}
-		.buttonStyle(.plain)
-		.accessibilityLabel("Settings")
+		PanelSettingsAccessoryButton(
+			isPresented: panelController.isSettingsPresented,
+			onToggle: panelController.toggleSettings
+		)
 		.padding(.top, PanelExpandedLayout.settingsButtonTopPadding)
 	}
 
