@@ -68,7 +68,6 @@ args = [
 # | lint-rust      | command   |     |
 # | lint-fix-swift | extend    |     |
 # | lint-swift     | command   |     |
-# | udeps          | command   |     |
 
 [tasks.lint]
 workspace = false
@@ -115,17 +114,6 @@ args = [
 	"--config",
 	".swiftlint.yml",
 	"apps/macos/InkFlow/InkFlow",
-]
-
-[tasks.udeps]
-workspace = false
-command = "cargo"
-toolchain = "nightly"
-args = [
-	"udeps",
-	"--workspace",
-	"--all-targets",
-	"--all-features",
 ]
 
 # Test
