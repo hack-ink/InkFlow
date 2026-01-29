@@ -63,7 +63,10 @@ pub extern "C" fn inkflow_engine_create() -> *mut InkFlowHandle {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
+/// # Safety
+/// The caller must pass a valid pointer returned by `inkflow_engine_create`.
+/// If the pointer is non-null, it must not be used after this call returns.
+pub unsafe extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
 	if handle.is_null() {
 		return;
 	}
@@ -80,15 +83,17 @@ pub extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
 		},
 	};
 
-	if let Some(engine) = guard.take() {
-		if let Err(err) = engine.stop() {
+	if let Some(engine) = guard.take()
+		&& let Err(err) = engine.stop() {
 			tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
 		}
-	}
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn inkflow_engine_submit_audio(
+/// # Safety
+/// The caller must pass a valid `handle` pointer returned by `inkflow_engine_create`.
+/// If `samples` is non-null, it must point to at least `sample_count` valid `f32` values.
+pub unsafe extern "C" fn inkflow_engine_submit_audio(
 	handle: *mut InkFlowHandle,
 	samples: *const f32,
 	sample_count: usize,
@@ -121,7 +126,10 @@ pub extern "C" fn inkflow_engine_submit_audio(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn inkflow_engine_register_callback(
+/// # Safety
+/// The caller must pass a valid `handle` pointer returned by `inkflow_engine_create`.
+/// The `callback` pointer must be a valid function pointer for the duration of the callback thread.
+pub unsafe extern "C" fn inkflow_engine_register_callback(
 	handle: *mut InkFlowHandle,
 	callback: InkFlowUpdateCallback,
 	user_data: *mut c_void,
@@ -159,7 +167,9 @@ pub extern "C" fn inkflow_engine_register_callback(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn inkflow_engine_unregister_callback(handle: *mut InkFlowHandle) {
+/// # Safety
+/// The caller must pass a valid pointer returned by `inkflow_engine_create`.
+pub unsafe extern "C" fn inkflow_engine_unregister_callback(handle: *mut InkFlowHandle) {
 	if handle.is_null() {
 		return;
 	}

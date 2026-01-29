@@ -119,59 +119,88 @@ final class PanelController: ObservableObject {
 		}
 		let scale = panel.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
 
-		let applyCornerRadius: (NSView, Bool, Bool) -> Void = { view, applyMask, useBoundsRadius in
-			view.wantsLayer = true
-			view.layoutSubtreeIfNeeded()
-			guard let layer = view.layer else {
-				return
-			}
-			layer.contentsScale = scale
-			layer.allowsEdgeAntialiasing = true
-			let boundsRadius = min(layer.bounds.width, layer.bounds.height) / 2
-			let resolvedRadius: CGFloat
-			if animated {
-				resolvedRadius = cornerRadius
-			} else if useBoundsRadius {
-				resolvedRadius = boundsRadius
-			} else {
-				resolvedRadius = cornerRadius
-			}
-			let alignedRadius = (resolvedRadius * scale).rounded(.toNearestOrAwayFromZero) / scale
-			if animated {
-				let animation = CABasicAnimation(keyPath: "cornerRadius")
-				animation.fromValue = layer.presentation()?.cornerRadius ?? layer.cornerRadius
-				animation.toValue = alignedRadius
-				animation.duration = self.animationDuration
-				animation.timingFunction = self.timingFunction
-				layer.add(animation, forKey: "cornerRadius")
-			}
-			layer.cornerRadius = alignedRadius
-			layer.cornerCurve = .circular
-			layer.masksToBounds = true
-			if applyMask {
-				if animated {
-					layer.mask = nil
-				} else {
-					self.applyMaskImage(to: layer, cornerRadius: alignedRadius, scale: scale)
-				}
-			} else {
-				layer.mask = nil
-			}
-		}
-
 		if let contentView = panel.contentView {
-			applyCornerRadius(contentView, false, !isExpanded)
+			applyCornerRadius(
+				to: contentView,
+				cornerRadius: cornerRadius,
+				scale: scale,
+				animated: animated,
+				options: CornerRadiusOptions(applyMask: false, useBoundsRadius: !isExpanded)
+			)
 		}
 
 		if let contentView = panel.contentViewController?.view {
-			applyCornerRadius(contentView, false, !isExpanded)
+			applyCornerRadius(
+				to: contentView,
+				cornerRadius: cornerRadius,
+				scale: scale,
+				animated: animated,
+				options: CornerRadiusOptions(applyMask: false, useBoundsRadius: !isExpanded)
+			)
 		}
 
 		if let frameView = panel.contentView?.superview {
-			applyCornerRadius(frameView, true, !isExpanded)
+			applyCornerRadius(
+				to: frameView,
+				cornerRadius: cornerRadius,
+				scale: scale,
+				animated: animated,
+				options: CornerRadiusOptions(applyMask: true, useBoundsRadius: !isExpanded)
+			)
 		}
 
 		panel.invalidateShadow()
+	}
+
+	private struct CornerRadiusOptions {
+		let applyMask: Bool
+		let useBoundsRadius: Bool
+	}
+
+	private func applyCornerRadius(
+		to view: NSView,
+		cornerRadius: CGFloat,
+		scale: CGFloat,
+		animated: Bool,
+		options: CornerRadiusOptions
+	) {
+		view.wantsLayer = true
+		view.layoutSubtreeIfNeeded()
+		guard let layer = view.layer else {
+			return
+		}
+		layer.contentsScale = scale
+		layer.allowsEdgeAntialiasing = true
+		let boundsRadius = min(layer.bounds.width, layer.bounds.height) / 2
+		let resolvedRadius: CGFloat
+		if animated {
+			resolvedRadius = cornerRadius
+		} else if options.useBoundsRadius {
+			resolvedRadius = boundsRadius
+		} else {
+			resolvedRadius = cornerRadius
+		}
+		let alignedRadius = (resolvedRadius * scale).rounded(.toNearestOrAwayFromZero) / scale
+		if animated {
+			let animation = CABasicAnimation(keyPath: "cornerRadius")
+			animation.fromValue = layer.presentation()?.cornerRadius ?? layer.cornerRadius
+			animation.toValue = alignedRadius
+			animation.duration = self.animationDuration
+			animation.timingFunction = self.timingFunction
+			layer.add(animation, forKey: "cornerRadius")
+		}
+		layer.cornerRadius = alignedRadius
+		layer.cornerCurve = .circular
+		layer.masksToBounds = true
+		if options.applyMask {
+			if animated {
+				layer.mask = nil
+			} else {
+				applyMaskImage(to: layer, cornerRadius: alignedRadius, scale: scale)
+			}
+		} else {
+			layer.mask = nil
+		}
 	}
 
 	private func applyMaskImage(to layer: CALayer, cornerRadius: CGFloat, scale: CGFloat) {

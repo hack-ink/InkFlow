@@ -339,31 +339,6 @@ pub struct WhisperProfiles {
 	pub second_pass_best_of: u8,
 }
 
-#[cfg(test)]
-mod tests {
-	use super::{SttSettings, WhisperSettings};
-
-	#[test]
-	fn whisper_default_language_is_auto() {
-		let settings = WhisperSettings::default();
-		assert_eq!(settings.language, "auto");
-	}
-
-	#[test]
-	fn window_backpressure_high_watermark_must_be_positive() {
-		let mut settings = SttSettings::default();
-		settings.window.window_backpressure_high_watermark = 0;
-		assert!(settings.validate().is_err());
-	}
-
-	#[test]
-	fn second_pass_queue_capacity_must_be_positive() {
-		let mut settings = SttSettings::default();
-		settings.second_pass_queue_capacity = 0;
-		assert!(settings.validate().is_err());
-	}
-}
-
 impl Default for WhisperProfiles {
 	fn default() -> Self {
 		Self { window_best_of: 1, second_pass_best_of: 5 }
@@ -385,5 +360,32 @@ impl WhisperProfiles {
 		}
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{SttSettings, WhisperSettings};
+
+	#[test]
+	fn whisper_default_language_is_auto() {
+		let settings = WhisperSettings::default();
+		assert_eq!(settings.language, "auto");
+	}
+
+	#[test]
+	fn window_backpressure_high_watermark_must_be_positive() {
+		let mut settings = SttSettings::default();
+		settings.window.window_backpressure_high_watermark = 0;
+		assert!(settings.validate().is_err());
+	}
+
+	#[test]
+	fn second_pass_queue_capacity_must_be_positive() {
+		let settings = SttSettings {
+			second_pass_queue_capacity: 0,
+			..Default::default()
+		};
+		assert!(settings.validate().is_err());
 	}
 }

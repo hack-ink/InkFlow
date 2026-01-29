@@ -214,9 +214,9 @@ impl LocalStreamSecondPassPipeline {
 		self.cancel.cancel();
 		drop(self.audio_tx);
 
-		if let Ok(mut handle) = self.asr_handle.lock() {
-			if let Some(handle) = handle.take() {
-				let result = self.runtime.block_on(async { handle.await });
+		if let Ok(mut handle) = self.asr_handle.lock()
+			&& let Some(handle) = handle.take() {
+				let result = self.runtime.block_on(handle);
 				match result {
 					Ok(Ok(())) => {},
 					Ok(Err(err)) => return Err(err),
@@ -228,9 +228,8 @@ impl LocalStreamSecondPassPipeline {
 					},
 				}
 			}
-		}
 
-		let result = self.runtime.block_on(async { self.whisper_handle.await });
+		let result = self.runtime.block_on(self.whisper_handle);
 		if let Err(err) = result {
 			return Err(AppError::new(
 				"whisper_task_failed",

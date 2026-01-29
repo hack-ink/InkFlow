@@ -106,7 +106,6 @@ args = [
 	"lint",
 	"--config",
 	".swiftlint.yml",
-	"--path",
 	"apps/macos/InkFlow/InkFlow",
 ]
 
@@ -116,7 +115,6 @@ args = [
 	"autocorrect",
 	"--config",
 	".swiftlint.yml",
-	"--path",
 	"apps/macos/InkFlow/InkFlow",
 ]
 

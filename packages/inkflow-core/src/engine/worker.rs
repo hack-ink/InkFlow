@@ -303,9 +303,7 @@ impl SecondPassScheduler {
 	}
 
 	fn append_tail(&mut self, _samples: &[f32]) -> Option<WhisperJob> {
-		let Some(mut pending) = self.pending.take() else {
-			return None;
-		};
+		let mut pending = self.pending.take()?;
 
 		if !pending.append_tail(_samples) {
 			self.pending = Some(pending);
@@ -316,9 +314,7 @@ impl SecondPassScheduler {
 	}
 
 	fn flush(&mut self, _force: bool) -> Option<WhisperJob> {
-		let Some(pending) = self.pending.take() else {
-			return None;
-		};
+		let pending = self.pending.take()?;
 
 		if pending.remaining_tail_samples == 0 || _force {
 			return Some(pending.into_job());
@@ -553,13 +549,12 @@ impl StreamWorker {
 	}
 
 	fn append_pending_tail(&mut self, samples: &[f32]) {
-		if let Some(job) = self.second_pass.append_tail(samples) {
-			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+		if let Some(job) = self.second_pass.append_tail(samples)
+			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
-		}
 	}
 
 	fn schedule_second_pass(
@@ -577,23 +572,21 @@ impl StreamWorker {
 			segment_samples,
 			peak_mean_abs,
 			tail_samples,
-		) {
-			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+		)
+			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
-		}
 	}
 
 	fn flush_pending_second_pass(&mut self, force: bool) {
-		if let Some(job) = self.second_pass.flush(force) {
-			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+		if let Some(job) = self.second_pass.flush(force)
+			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
-		}
 	}
 
 	fn enqueue_second_pass(
@@ -881,6 +874,7 @@ mod second_pass_scheduler_tests {
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_whisper_worker(
 	handle: &tokio::runtime::Handle,
 	cancel: CancellationToken,

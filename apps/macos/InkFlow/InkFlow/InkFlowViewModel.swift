@@ -103,8 +103,8 @@ final class InkFlowViewModel: ObservableObject {
 					return
 				}
 				self.handleWaveformInput(samples)
-				let ok = client.submitAudio(samples: samples, sampleRate: sampleRate)
-				if !ok {
+				let submitSucceeded = client.submitAudio(samples: samples, sampleRate: sampleRate)
+				if !submitSucceeded {
 					DispatchQueue.main.async {
 						self.status = "Audio submit failed"
 					}

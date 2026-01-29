@@ -67,7 +67,7 @@ final class PanelHostViewController: NSViewController {
 			backgroundHost.topAnchor.constraint(equalTo: view.topAnchor),
 			backgroundHost.leadingAnchor.constraint(equalTo: view.leadingAnchor),
 			backgroundHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-			backgroundHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+			backgroundHost.bottomAnchor.constraint(equalTo: view.bottomAnchor)
 		])
 
 		headerTopConstraint = headerHost.topAnchor.constraint(
@@ -85,7 +85,7 @@ final class PanelHostViewController: NSViewController {
 				expandedHost.topAnchor.constraint(equalTo: headerHost.bottomAnchor, constant: spacing),
 				expandedHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
 				expandedHost.trailingAnchor.constraint(
-					equalTo: view.trailingAnchor, constant: -padding),
+					equalTo: view.trailingAnchor, constant: -padding)
 			].compactMap { $0 })
 
 		expandedHeightConstraint = expandedHost.heightAnchor.constraint(equalToConstant: 0)

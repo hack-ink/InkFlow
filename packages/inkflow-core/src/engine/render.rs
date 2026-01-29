@@ -174,14 +174,11 @@ impl RenderState {
 				if incoming.is_empty() {
 					return None;
 				}
-				let Some(&index) = self.segment_index.get(segment_id) else {
-					return None;
-				};
-				if let Some(existing) = self.last_second_pass_text.get(segment_id) {
-					if existing == incoming {
+				let &index = self.segment_index.get(segment_id)?;
+				if let Some(existing) = self.last_second_pass_text.get(segment_id)
+					&& existing == incoming {
 						return None;
 					}
-				}
 				let current = self.committed_segments.get(index).map(String::as_str).unwrap_or("");
 				let mode = domain::token_mode_for_language("auto", incoming);
 				if !domain::should_accept_second_pass_replacement(current, incoming, mode) {

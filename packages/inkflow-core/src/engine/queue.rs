@@ -37,7 +37,7 @@ impl SecondPassQueue {
 			let Some((drop_index, drop_peak)) = queue
 				.iter()
 				.enumerate()
-				.filter_map(|(idx, item)| Some((idx, peak_mean_abs(item))))
+				.map(|(idx, item)| (idx, peak_mean_abs(item)))
 				.min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
 			else {
 				return false;

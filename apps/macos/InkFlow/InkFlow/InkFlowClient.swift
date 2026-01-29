@@ -46,7 +46,7 @@ final class InkFlowClient {
 
 		self.onUpdate = onUpdate
 		let userData = Unmanaged.passUnretained(self).toOpaque()
-		let result = inkflow_engine_register_callback(handle, inkflow_update_callback, userData)
+		let result = inkflow_engine_register_callback(handle, inkflowUpdateCallback, userData)
 		callbackRegistered = result == INKFLOW_OK
 		return callbackRegistered
 	}
@@ -100,7 +100,7 @@ final class InkFlowClient {
 	}
 }
 
-private let inkflow_update_callback: inkflow_update_cb = { cString, userData in
+private let inkflowUpdateCallback: inkflow_update_cb = { cString, userData in
 	guard let userData else {
 		return
 	}

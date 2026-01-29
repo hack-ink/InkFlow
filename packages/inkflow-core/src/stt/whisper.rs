@@ -222,25 +222,6 @@ fn is_cjk(c: char) -> bool {
 	)
 }
 
-#[cfg(test)]
-mod tests {
-	use super::append_trimmed_text;
-
-	#[test]
-	fn append_trimmed_text_inserts_space_between_latin_tokens() {
-		let mut out = String::from("hello");
-		append_trimmed_text(&mut out, "world");
-		assert_eq!(out, "hello world");
-	}
-
-	#[test]
-	fn append_trimmed_text_avoids_space_for_cjk() {
-		let mut out = String::from("你好");
-		append_trimmed_text(&mut out, "世界");
-		assert_eq!(out, "你好世界");
-	}
-}
-
 fn build_decode_params(
 	config: &WhisperConfig,
 	profile: WhisperDecodeProfile,
@@ -390,4 +371,23 @@ fn whisper_ts_to_ms(ts: i64) -> u64 {
 	}
 
 	(ts as u64).saturating_mul(10)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::append_trimmed_text;
+
+	#[test]
+	fn append_trimmed_text_inserts_space_between_latin_tokens() {
+		let mut out = String::from("hello");
+		append_trimmed_text(&mut out, "world");
+		assert_eq!(out, "hello world");
+	}
+
+	#[test]
+	fn append_trimmed_text_avoids_space_for_cjk() {
+		let mut out = String::from("你好");
+		append_trimmed_text(&mut out, "世界");
+		assert_eq!(out, "你好世界");
+	}
 }
