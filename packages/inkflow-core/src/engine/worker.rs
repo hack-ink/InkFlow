@@ -1,7 +1,10 @@
 use std::{
 	collections::hash_map::DefaultHasher,
 	hash::{Hash, Hasher},
-	sync::{Arc, atomic::{AtomicU64, Ordering}},
+	sync::{
+		Arc,
+		atomic::{AtomicU64, Ordering},
+	},
 	time::Duration,
 };
 
@@ -29,10 +32,7 @@ pub(crate) struct SpeechActivity {
 
 impl SpeechActivity {
 	pub(crate) fn new() -> Self {
-		Self {
-			start: std::time::Instant::now(),
-			last_ms: AtomicU64::new(0),
-		}
+		Self { start: std::time::Instant::now(), last_ms: AtomicU64::new(0) }
 	}
 
 	pub(crate) fn mark(&self) {
@@ -96,7 +96,8 @@ impl WhisperWorker {
 
 					let start = audio_16k.len().saturating_sub(window_activity_samples_16k.max(1));
 					let metrics = activity_metrics(&audio_16k[start..], 16_000);
-					if !self.speech_activity.is_recent(window_activity_ms) && !gate.allows(&metrics) {
+					if !self.speech_activity.is_recent(window_activity_ms) && !gate.allows(&metrics)
+					{
 						if !self.window_gate_blocked {
 							self.window_gate_blocked = true;
 							tracing::debug!(
@@ -163,9 +164,7 @@ impl WhisperWorker {
 
 	fn drain_second_pass(&mut self) {
 		loop {
-			let Some(job) =
-				self.second_pass_queue.pop(Duration::from_millis(1))
-			else {
+			let Some(job) = self.second_pass_queue.pop(Duration::from_millis(1)) else {
 				break;
 			};
 
@@ -182,11 +181,7 @@ impl WhisperWorker {
 				continue;
 			}
 
-			tracing::debug!(
-				segment_id,
-				samples = samples.len(),
-				"Second-pass dequeued."
-			);
+			tracing::debug!(segment_id, samples = samples.len(), "Second-pass dequeued.");
 
 			let audio_16k = stt::resample_linear_to_16k(&samples, sample_rate_hz);
 			match stt::transcribe_segments(
@@ -559,12 +554,8 @@ impl StreamWorker {
 
 	fn append_pending_tail(&mut self, samples: &[f32]) {
 		if let Some(job) = self.second_pass.append_tail(samples) {
-			if let WhisperJob::SecondPass {
-				segment_id,
-				sample_rate_hz,
-				samples,
-				peak_mean_abs,
-			} = job
+			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
@@ -587,12 +578,8 @@ impl StreamWorker {
 			peak_mean_abs,
 			tail_samples,
 		) {
-			if let WhisperJob::SecondPass {
-				segment_id,
-				sample_rate_hz,
-				samples,
-				peak_mean_abs,
-			} = job
+			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
@@ -601,12 +588,8 @@ impl StreamWorker {
 
 	fn flush_pending_second_pass(&mut self, force: bool) {
 		if let Some(job) = self.second_pass.flush(force) {
-			if let WhisperJob::SecondPass {
-				segment_id,
-				sample_rate_hz,
-				samples,
-				peak_mean_abs,
-			} = job
+			if let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+				job
 			{
 				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
 			}
@@ -639,9 +622,7 @@ fn ms_to_samples(sample_rate_hz: u32, ms: u64) -> usize {
 		return 0;
 	}
 
-	(sample_rate_hz as u64)
-		.saturating_mul(ms)
-		.saturating_div(1_000) as usize
+	(sample_rate_hz as u64).saturating_mul(ms).saturating_div(1_000) as usize
 }
 
 struct WindowDecodeCache {
@@ -685,8 +666,8 @@ impl ActivityGate {
 		}
 
 		let energy_ok = metrics.mean_abs >= self.min_mean_abs && metrics.rms >= self.min_rms;
-		let energy_relaxed = metrics.mean_abs >= self.min_mean_abs * 0.6
-			&& metrics.rms >= self.min_rms * 0.6;
+		let energy_relaxed =
+			metrics.mean_abs >= self.min_mean_abs * 0.6 && metrics.rms >= self.min_rms * 0.6;
 		if !energy_ok && !energy_relaxed {
 			return false;
 		}
@@ -698,10 +679,9 @@ impl ActivityGate {
 		const ENERGY_BOOST: f32 = 1.5;
 		const ZCR_RELAX_FACTOR: f32 = 0.8;
 
-		let mean_boost = self.min_mean_abs > 0.0
-			&& metrics.mean_abs >= self.min_mean_abs * ENERGY_BOOST;
-		let rms_boost = self.min_rms > 0.0
-			&& metrics.rms >= self.min_rms * ENERGY_BOOST;
+		let mean_boost =
+			self.min_mean_abs > 0.0 && metrics.mean_abs >= self.min_mean_abs * ENERGY_BOOST;
+		let rms_boost = self.min_rms > 0.0 && metrics.rms >= self.min_rms * ENERGY_BOOST;
 		let band_ok = metrics.band_energy_ratio >= self.min_band_energy_ratio;
 		let low_noise =
 			metrics.zero_crossing_rate <= self.max_zero_crossing_rate * ZCR_RELAX_FACTOR;
@@ -786,8 +766,7 @@ fn band_energy_ratio(samples: &[f32], sample_rate_hz: u32) -> f32 {
 
 #[cfg(test)]
 mod activity_tests {
-	use super::activity_metrics;
-	use super::{ActivityGate, ActivityMetrics};
+	use super::{ActivityGate, ActivityMetrics, activity_metrics};
 	use crate::settings::SttSettings;
 
 	#[test]

@@ -3,11 +3,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use crate::{
-	AsrUpdate, domain,
-	settings::SttSettings,
-	stt,
-};
+use crate::{AsrUpdate, domain, settings::SttSettings, stt};
 
 use super::text;
 
@@ -79,8 +75,7 @@ impl RenderState {
 					return None;
 				}
 
-				let tail =
-					window_tail_text(snapshot, result, self.committed_end_16k);
+				let tail = window_tail_text(snapshot, result, self.committed_end_16k);
 				if tail.is_empty() {
 					return None;
 				}
@@ -312,10 +307,7 @@ fn render_preview(text: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
 	use super::RenderState;
-	use crate::{
-		AsrUpdate, settings::SttSettings, stt,
-		stt::WhisperDecodedSegment,
-	};
+	use crate::{AsrUpdate, settings::SttSettings, stt, stt::WhisperDecodedSegment};
 
 	#[derive(Debug, Default)]
 	struct JitterMetrics {
@@ -391,8 +383,7 @@ mod tests {
 			has_timestamps: true,
 		};
 
-		let out =
-			state.handle_update(&AsrUpdate::WindowResult { snapshot, result }, &settings);
+		let out = state.handle_update(&AsrUpdate::WindowResult { snapshot, result }, &settings);
 		assert!(out.is_none());
 	}
 
@@ -491,14 +482,15 @@ mod tests {
 		};
 		let result = stt::WhisperDecodeResult {
 			text: "hello window".into(),
-			segments: vec![WhisperDecodedSegment { t0_ms: 0, t1_ms: 200, text: "hello window".into() }],
+			segments: vec![WhisperDecodedSegment {
+				t0_ms: 0,
+				t1_ms: 200,
+				text: "hello window".into(),
+			}],
 			has_timestamps: true,
 		};
 
-		let out = state.handle_update(
-			&AsrUpdate::WindowResult { snapshot, result },
-			&settings,
-		);
+		let out = state.handle_update(&AsrUpdate::WindowResult { snapshot, result }, &settings);
 		assert!(out.is_some());
 
 		let out = state.handle_update(
@@ -592,10 +584,8 @@ mod tests {
 		);
 		assert!(out.is_some());
 
-		let out = state.handle_update(
-			&AsrUpdate::WindowResult { snapshot, result: second },
-			&settings,
-		);
+		let out =
+			state.handle_update(&AsrUpdate::WindowResult { snapshot, result: second }, &settings);
 		assert!(out.is_none());
 	}
 

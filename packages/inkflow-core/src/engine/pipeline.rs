@@ -10,9 +10,9 @@ use crate::{error::AppError, settings::SttSettings, stt};
 
 use super::{
 	AsrUpdate,
+	modes::{DecodeMode, InferenceMode, PipelinePlan},
 	queue::SecondPassQueue,
 	render::RenderState,
-	modes::{DecodeMode, InferenceMode, PipelinePlan},
 	worker::{SpeechActivity, WhisperJob, spawn_asr_worker, spawn_whisper_worker},
 };
 
@@ -184,8 +184,7 @@ impl LocalStreamSecondPassPipeline {
 			match guard.try_recv() {
 				Ok(update) => {
 					if let Ok(mut renderer) = self.render_state.lock() {
-						if let Some(rendered) =
-							renderer.handle_update(&update, &self.stt_settings)
+						if let Some(rendered) = renderer.handle_update(&update, &self.stt_settings)
 						{
 							pending.push_back(rendered);
 						}

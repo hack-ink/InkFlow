@@ -1,12 +1,12 @@
-[tasks.clippy]
-workspace = false
-command = "cargo"
-args = [
-	"clippy",
-	"--workspace",
-	"--all-targets",
-	"--all-features",
-]
+# Run (services/apps)
+# | task            | type    | cwd |
+# | --------------- | ------- | --- |
+# | dev             | command |     |
+# | release         | command |     |
+# | stt-compare     | command |     |
+# | stt-compare-mic | command |     |
+# | sherpa-demo     | command |     |
+# | sherpa-demo-mic | command |     |
 
 [tasks.dev]
 workspace = false
@@ -22,75 +22,6 @@ args = [
 	"build",
 ]
 
-[tasks.fmt]
-workspace = false
-dependencies = [
-	"fmt-rust",
-	"fmt-swift",
-	"fmt-taplo",
-]
-
-[tasks.fmt-rust]
-workspace = false
-command = "cargo"
-toolchain = "nightly"
-args = [
-	"fmt",
-	"--all",
-]
-
-[tasks.fmt-swift]
-workspace = false
-command = "swift"
-args = [
-	"format",
-	"--recursive",
-	"--in-place",
-	"--configuration",
-	".swift-format",
-	"apps/macos/InkFlow/InkFlow",
-]
-
-[tasks.fmt-taplo]
-workspace = false
-command = "taplo"
-args = ["fmt"]
-
-[tasks.lint]
-workspace = false
-dependencies = ["clippy", "lint-swift"]
-
-[tasks.lint-swift]
-workspace = false
-command = "swiftlint"
-args = [
-	"lint",
-	"--config",
-	".swiftlint.yml",
-	"--path",
-	"apps/macos/InkFlow/InkFlow",
-]
-
-[tasks.nextest]
-workspace = false
-command = "cargo"
-args = [
-	"nextest",
-	"run",
-	"--workspace",
-	"--all-targets",
-	"--all-features",
-	"--no-tests",
-	"pass",
-]
-
-[tasks.setup-macos]
-workspace = false
-command = "bash"
-args = [
-	"scripts/setup_macos.sh",
-]
-
 [tasks.release]
 workspace = false
 dependencies = ["setup-macos"]
@@ -103,17 +34,6 @@ args = [
 	"-configuration",
 	"Release",
 	"build",
-]
-
-[tasks.udeps]
-workspace = false
-command = "cargo"
-toolchain = "nightly"
-args = [
-	"udeps",
-	"--workspace",
-	"--all-targets",
-	"--all-features",
 ]
 
 [tasks.stt-compare]
@@ -143,3 +63,193 @@ args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry 
 workspace = false
 command = "bash"
 args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo --mic"]
+
+# Lint
+# | task           | type      | cwd |
+# | -------------- | --------- | --- |
+# | lint           | composite |     |
+# | lint-fix-rust  | extend    |     |
+# | lint-rust      | command   |     |
+# | lint-fix-swift | extend    |     |
+# | lint-swift     | command   |     |
+# | udeps          | command   |     |
+
+[tasks.lint]
+workspace = false
+dependencies = ["lint-rust", "lint-swift"]
+
+[tasks.lint-rust]
+workspace = false
+command = "cargo"
+args = [
+	"clippy",
+	"--workspace",
+	"--all-targets",
+	"--all-features",
+]
+
+[tasks.lint-fix-rust]
+extend = "lint-rust"
+args = [
+	"clippy",
+	"--fix",
+	"--allow-dirty",
+	"--workspace",
+	"--all-targets",
+	"--all-features",
+]
+
+[tasks.lint-swift]
+workspace = false
+command = "swiftlint"
+args = [
+	"lint",
+	"--config",
+	".swiftlint.yml",
+	"--path",
+	"apps/macos/InkFlow/InkFlow",
+]
+
+[tasks.lint-fix-swift]
+extend = "lint-swift"
+args = [
+	"autocorrect",
+	"--config",
+	".swiftlint.yml",
+	"--path",
+	"apps/macos/InkFlow/InkFlow",
+]
+
+[tasks.udeps]
+workspace = false
+command = "cargo"
+toolchain = "nightly"
+args = [
+	"udeps",
+	"--workspace",
+	"--all-targets",
+	"--all-features",
+]
+
+# Test
+# | task      | type      | cwd |
+# | --------- | --------- | --- |
+# | test      | composite |     |
+# | test-rust | command   |     |
+
+[tasks.test]
+workspace = false
+dependencies = ["test-rust"]
+
+[tasks.test-rust]
+workspace = false
+command = "cargo"
+args = [
+	"nextest",
+	"run",
+	"--workspace",
+	"--all-targets",
+	"--all-features",
+	"--no-tests",
+	"pass",
+]
+
+# Format
+# | task            | type      | cwd |
+# | --------------- | --------- | --- |
+# | fmt             | composite |     |
+# | fmt-check       | composite |     |
+# | fmt-rust        | command   |     |
+# | fmt-rust-check  | extend    |     |
+# | fmt-swift       | command   |     |
+# | fmt-swift-check | command   |     |
+# | fmt-taplo       | command   |     |
+# | fmt-taplo-check | extend    |     |
+
+[tasks.fmt]
+workspace = false
+dependencies = [
+	"fmt-rust",
+	"fmt-swift",
+	"fmt-taplo",
+]
+
+[tasks.fmt-check]
+workspace = false
+dependencies = [
+	"fmt-rust-check",
+	"fmt-swift-check",
+	"fmt-taplo-check",
+]
+
+[tasks.fmt-rust]
+workspace = false
+command = "cargo"
+toolchain = "nightly"
+args = [
+	"fmt",
+	"--all",
+]
+
+[tasks.fmt-rust-check]
+extend = "fmt-rust"
+args = [
+	"fmt",
+	"--all",
+	"--",
+	"--check",
+]
+
+[tasks.fmt-swift]
+workspace = false
+command = "swift"
+args = [
+	"format",
+	"--recursive",
+	"--in-place",
+	"--configuration",
+	".swift-format",
+	"apps/macos/InkFlow/InkFlow",
+]
+
+[tasks.fmt-swift-check]
+workspace = false
+command = "swift"
+args = [
+	"format",
+	"--recursive",
+	"--lint",
+	"--configuration",
+	".swift-format",
+	"apps/macos/InkFlow/InkFlow",
+]
+
+[tasks.fmt-taplo]
+workspace = false
+command = "taplo"
+args = ["fmt"]
+
+[tasks.fmt-taplo-check]
+extend = "fmt-taplo"
+args = ["fmt", "--check"]
+
+# Set up/Install
+# | task        | type    | cwd |
+# | ----------- | ------- | --- |
+# | setup-macos | command |     |
+
+[tasks.setup-macos]
+workspace = false
+command = "bash"
+args = [
+	"scripts/setup_macos.sh",
+]
+
+# Meta/Orchestration
+# | task   | type      | cwd |
+# | ------ | --------- | --- |
+# | checks | composite |     |
+
+[tasks.checks]
+workspace = false
+dependencies = ["lint", "fmt-check", "test"]

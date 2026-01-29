@@ -13,19 +13,13 @@ Do not apply them to non-Rust projects.
 - MUST indicates a strict requirement.
 - SHOULD indicates a strong preference.
 - MAY indicates an optional choice.
+- Unless a rule uses SHOULD or MAY, treat imperative statements as MUST.
 - rustfmt output is always the final authority for formatting.
 
-## Normative Rules
+## Development Rules
 
 ### Tooling and Toolchain
 
-- Use the workspace `cargo make` tasks when they are the best fit for the job:
-  - `cargo make fmt`.
-  - `cargo make clippy`.
-  - `cargo make nextest`.
-  - `cargo make sqlx`.
-- You may use raw `cargo` commands when they are more appropriate for the specific task or when explicitly requested.
-- Do not set `DATABASE_URL` manually when running `cargo make` tasks.
 - The Rust toolchain is pinned.
 - Do not modify `rust-toolchain.toml`, `.cargo/config.toml`, or `rustfmt.toml`.
 - Do not install, update, or override toolchains.
@@ -34,8 +28,10 @@ Do not apply them to non-Rust projects.
 ### Runtime Safety
 
 - Do not use `unwrap()` in non-test code.
-- `expect()` is allowed only in global or static initialization and one-time startup initialization where failure should terminate the process immediately with a clear message.
+- `expect()` requires a clear message.
 - Never block inside async contexts.
+
+## Style Rules
 
 ### Indentation
 
@@ -62,7 +58,7 @@ fn
 Within each group, `pub` items MUST appear before non-`pub` items.
 Within the `fn` group and the same visibility level, non-`async` functions MUST appear before `async` functions.
 
-Example (non-normative):
+Example (illustrative):
 
 ```rust
 pub fn build_request() -> Request {
@@ -122,13 +118,12 @@ Inside `impl Type` blocks, you MUST use `Self` instead of the concrete type name
 implementing type in method signatures (parameters and return types), including references, slices,
 and generic containers.
 
-Examples (non-normative):
+Examples (illustrative):
 
 Allowed:
 
 ```rust
 struct A;
-
 impl A {
 	fn new() -> Self {
 		Self
@@ -152,7 +147,6 @@ Forbidden:
 
 ```rust
 struct A;
-
 impl A {
 	fn new() -> A {
 		A
@@ -200,7 +194,7 @@ fn render<T: Display>(value: T) -> String {
 - Tracing calls MUST use structured fields for dynamic values such as identifiers, names, counts, statuses, sizes, durations, and errors.
 - You MUST NOT encode those values only in the message string.
 
-Examples (non-normative):
+Examples (illustrative):
 
 Allowed:
 
@@ -237,30 +231,30 @@ Forbidden:
 - `10000`.
 - `1000000`.
 
-## Guidance (Non-Normative)
+## Additional Mandatory Rules
 
-Guidance is non-normative. Follow it unless it conflicts with MUST rules, rustfmt output, or explicit requirements.
+All rules in this section are mandatory.
 
 ### Declaration Order
 
-- Inside `#[cfg(test)] mod tests`, prefer `use super::*;` before any other `use` statements.
+- Inside `#[cfg(test)] mod tests`, use `use super::*;`.
 
 ### Imports and Headers
 
-- If `crate::prelude::*` is imported, avoid redundant imports.
+- If `crate::prelude::*` is imported, do not add redundant imports.
 
 ### Logging Rules
 
 - Use a short, action-oriented message alongside structured fields.
-- Avoid creating temporary variables solely for logging.
+- Do not create temporary variables solely for logging.
 
 ### Error Wrapping
 
 - Add contextual messages at crate or module boundaries and keep the original error as the source.
 - Use `#[error(transparent)]` only for thin wrappers where this crate adds no context and the upstream message is already sufficient for developers.
-- Prefer short, action-oriented messages that name the operation and include the source error.
+- Use short, action-oriented messages that name the operation and include the source error.
 
-Example (non-normative):
+Example (illustrative):
 
 ```rust
 #[derive(Debug, thiserror::Error)]
@@ -275,13 +269,13 @@ pub enum Error {
 
 ### Borrowing and Ownership
 
-- Prefer `&value` over `.as_ref()` or `.as_str()` where applicable.
-- Avoid `.clone()` unless it is required by ownership or lifetimes.
-- Use `into_iter()` when consuming collections intentionally.
+- Prefer borrowing with `&` over `.as_*()` conversions (for example, `.as_ref()`, `.as_str()`) when both are applicable.
+- Avoid `.clone()` unless it is required by ownership or lifetimes, or it clearly improves clarity. Do not pay a cost with no benefit.
+- Use `into_iter()` when intentionally consuming collections.
 - Do not use scope blocks solely to end a borrow.
 - When an early release is required, use an explicit `drop`.
-- When the value is a reference, prefer `let _ = value;` to end the borrow without triggering a drop warning.
-- Avoid single-use `let` bindings that only forward a value; inline the expression unless it improves readability, error handling, or avoids repeated work.
+- When the value is a reference and you need to end a borrow without a drop warning, use `let _ = value;`.
+- Do not create single-use `let` bindings that only forward a value; inline the expression unless it improves readability, error handling, or avoids repeated work.
 
 ### Vertical Spacing
 

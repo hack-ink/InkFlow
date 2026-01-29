@@ -341,8 +341,7 @@ pub struct WhisperProfiles {
 
 #[cfg(test)]
 mod tests {
-	use super::WhisperSettings;
-	use super::SttSettings;
+	use super::{SttSettings, WhisperSettings};
 
 	#[test]
 	fn whisper_default_language_is_auto() {

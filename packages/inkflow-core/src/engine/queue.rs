@@ -61,10 +61,8 @@ impl SecondPassQueue {
 		let mut queue = self.inner.lock().unwrap_or_else(|err| err.into_inner());
 
 		if queue.is_empty() {
-			let (guard, _) = self
-				.available
-				.wait_timeout(queue, timeout)
-				.unwrap_or_else(|err| err.into_inner());
+			let (guard, _) =
+				self.available.wait_timeout(queue, timeout).unwrap_or_else(|err| err.into_inner());
 			queue = guard;
 		}
 
@@ -112,14 +110,8 @@ struct DropLogState {
 impl DropLogState {
 	fn new() -> Self {
 		let now = Instant::now();
-		let last_log = now
-			.checked_sub(Duration::from_secs(60))
-			.unwrap_or(now);
-		Self {
-			last_log,
-			interval: Duration::from_secs(2),
-			dropped: 0,
-		}
+		let last_log = now.checked_sub(Duration::from_secs(60)).unwrap_or(now);
+		Self { last_log, interval: Duration::from_secs(2), dropped: 0 }
 	}
 }
 

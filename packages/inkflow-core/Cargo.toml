@@ -17,5 +17,5 @@ whisper-rs = { workspace = true, features = ["metal"] }
 whisper-rs = { workspace = true }
 
 [dev-dependencies]
-hound = { workspace = true }
+hound              = { workspace = true }
 tracing-subscriber = { workspace = true }

@@ -50,11 +50,8 @@ mod tests {
 		let trailing_silence = vec![0.0_f32; (sample_rate_hz as usize) * 2];
 		samples.extend_from_slice(&trailing_silence);
 
-		let engine = InkFlowEngine::start(SttSettings::default())
-			.expect("Engine should start");
-		engine
-			.submit_audio(&samples, sample_rate_hz)
-			.expect("Audio submission should succeed");
+		let engine = InkFlowEngine::start(SttSettings::default()).expect("Engine should start");
+		engine.submit_audio(&samples, sample_rate_hz).expect("Audio submission should succeed");
 
 		let deadline = Instant::now() + Duration::from_secs(30);
 		let mut second_pass_text = None;

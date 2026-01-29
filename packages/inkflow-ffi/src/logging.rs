@@ -204,14 +204,15 @@ fn prune_old_logs_at(log_dir: &Path, filename: &str, max_age: Duration, now: Sys
 
 #[cfg(test)]
 mod tests {
-	use std::path::PathBuf;
-	use std::time::{Duration, SystemTime, UNIX_EPOCH};
+	use std::{
+		path::PathBuf,
+		time::{Duration, SystemTime, UNIX_EPOCH},
+	};
 
 	use directories::ProjectDirs;
 
 	use super::{
-		FileOutputConfig, LogOutput, LoggingConfig, Rotation, build_log_dir,
-		prune_old_logs_at,
+		FileOutputConfig, LogOutput, LoggingConfig, Rotation, build_log_dir, prune_old_logs_at,
 	};
 
 	#[test]
@@ -251,10 +252,7 @@ mod tests {
 
 	#[test]
 	fn prune_old_logs_removes_files_older_than_cutoff() {
-		let stamp = SystemTime::now()
-			.duration_since(UNIX_EPOCH)
-			.unwrap_or_default()
-			.as_nanos();
+		let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
 		let root = std::env::temp_dir().join(format!("inkflow-logs-{stamp}"));
 		std::fs::create_dir_all(&root).unwrap();
 

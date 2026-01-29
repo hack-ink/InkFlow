@@ -28,13 +28,13 @@ hound              = { version = "3.5" }
 libloading         = { version = "0.9" }
 serde              = { version = "1.0", features = ["derive"] }
 serde_json         = { version = "1.0" }
-tokio              = { version = "1.48", features = ["sync", "time"] }
+tokio              = { version = "1.49", features = ["sync", "time"] }
 tokio-util         = { version = "0.7" }
 toml               = { version = "0.9" }
 tracing            = { version = "0.1" }
 tracing-appender   = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-vergen-gitcl       = { version = "1.0", features = ["cargo"] }
+vergen-gitcl       = { version = "9.1", features = ["cargo"] }
 whisper-rs         = { version = "0.15" }
 # self
 sherpa-onnx     = { version = "0.1", path = "packages/sherpa-onnx" }
