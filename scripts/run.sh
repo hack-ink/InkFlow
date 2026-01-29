@@ -5,9 +5,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${ROOT_DIR}/apps/macos/InkFlow"
 PROJECT="${APP_DIR}/InkFlow.xcodeproj"
 SCHEME="InkFlow"
-CONFIGURATION="${CONFIGURATION:-Debug}"
 DERIVED_DATA_DIR="${APP_DIR}/.build"
 RENDER_DEBUG_LOG="${RENDER_DEBUG_LOG:-inkflow_core::engine::render=debug,inkflow_core=info}"
+
+MODE="${1:-}"
+if [ -n "${MODE}" ]; then
+  case "${MODE}" in
+    debug|Debug|DEBUG)
+      CONFIGURATION="Debug"
+      ;;
+    release|Release|RELEASE)
+      CONFIGURATION="Release"
+      ;;
+    *)
+      echo "Unknown configuration \"${MODE}\". Use \"debug\" or \"release\"." >&2
+      exit 1
+      ;;
+  esac
+elif [ -n "${CONFIGURATION:-}" ]; then
+  CONFIGURATION="${CONFIGURATION}"
+else
+  CONFIGURATION="Debug"
+fi
 
 if [ -d "${HOME}/.cargo/bin" ]; then
   export PATH="${HOME}/.cargo/bin:${PATH}"

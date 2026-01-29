@@ -21,7 +21,7 @@ tokio, tracing.
 - Modify: `packages/inkflow-ffi/Cargo.toml`
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Create: `scripts/run-debug.sh`
+- Create: `scripts/run.sh`
 
 **Step 1: Run logging tests**
 
@@ -30,7 +30,7 @@ Expected: PASS.
 
 **Step 2: Validate debug script behavior**
 
-Run: `scripts/run-debug.sh`  
+Run: `scripts/run.sh`  
 Expected: Builds and launches the Debug app bundle.
 
 **Step 3: Commit**
@@ -38,7 +38,7 @@ Expected: Builds and launches the Debug app bundle.
 ```bash
 git add Cargo.toml Cargo.lock packages/inkflow-ffi/Cargo.toml \
   packages/inkflow-ffi/src/logging.rs packages/inkflow-ffi/src/lib.rs \
-  scripts/run-debug.sh
+  scripts/run.sh
 git commit -m "feat: add file-only logging and debug run script"
 ```
 
@@ -173,7 +173,7 @@ Remove `segments` and `segmentIndex` if no longer needed, keeping only `liveText
 
 **Step 3: Build the app**
 
-Run: `scripts/run-debug.sh`  
+Run: `scripts/run.sh`  
 Expected: Build succeeds and the UI updates from `live_render`.
 
 **Step 4: Commit**

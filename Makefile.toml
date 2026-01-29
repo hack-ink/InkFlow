@@ -11,29 +11,19 @@
 [tasks.dev]
 workspace = false
 dependencies = ["setup-macos"]
-command = "xcodebuild"
+command = "bash"
 args = [
-	"-project",
-	"apps/macos/InkFlow/InkFlow.xcodeproj",
-	"-scheme",
-	"InkFlow",
-	"-configuration",
-	"Debug",
-	"build",
+	"-lc",
+	"scripts/run.sh debug",
 ]
 
 [tasks.release]
 workspace = false
 dependencies = ["setup-macos"]
-command = "xcodebuild"
+command = "bash"
 args = [
-	"-project",
-	"apps/macos/InkFlow/InkFlow.xcodeproj",
-	"-scheme",
-	"InkFlow",
-	"-configuration",
-	"Release",
-	"build",
+	"-lc",
+	"scripts/run.sh release",
 ]
 
 [tasks.stt-compare]
@@ -57,12 +47,18 @@ args = [
 [tasks.sherpa-demo]
 workspace = false
 command = "bash"
-args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo"]
+args = [
+	"-lc",
+	"cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo",
+]
 
 [tasks.sherpa-demo-mic]
 workspace = false
 command = "bash"
-args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo --mic"]
+args = [
+	"-lc",
+	"cd research/sherpa && poetry install --no-interaction && poetry run sherpa-onnx-demo --mic",
+]
 
 # Lint
 # | task           | type      | cwd |
@@ -76,7 +72,10 @@ args = ["-lc", "cd research/sherpa && poetry install --no-interaction && poetry 
 
 [tasks.lint]
 workspace = false
-dependencies = ["lint-rust", "lint-swift"]
+dependencies = [
+	"lint-rust",
+	"lint-swift",
+]
 
 [tasks.lint-rust]
 workspace = false
@@ -229,7 +228,10 @@ args = ["fmt"]
 
 [tasks.fmt-taplo-check]
 extend = "fmt-taplo"
-args = ["fmt", "--check"]
+args = [
+	"fmt",
+	"--check",
+]
 
 # Set up/Install
 # | task        | type    | cwd |
@@ -240,7 +242,7 @@ args = ["fmt", "--check"]
 workspace = false
 command = "bash"
 args = [
-	"scripts/setup_macos.sh",
+	"scripts/setup-macos.sh",
 ]
 
 # Meta/Orchestration
@@ -250,4 +252,8 @@ args = [
 
 [tasks.checks]
 workspace = false
-dependencies = ["lint", "fmt-check", "test"]
+dependencies = [
+	"lint",
+	"fmt-check",
+	"test",
+]
