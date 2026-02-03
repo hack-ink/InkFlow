@@ -43,6 +43,27 @@ Requirements for repository artifacts:
 
 **These language rules override any conflicting rules elsewhere for repository artifacts.**
 
+### Commit Message Schema
+
+Commit messages are exempt from the English language and punctuation rules above.
+All commit messages must follow the schema below exactly.
+
+Schema (single line JSON with fixed key order):
+`{"schema":"cmsg/1","type":"feat|fix|refactor|docs|chore|build|ci|perf|revert","scope":"global|<component>","summary":"...","intent":"...","impact":"...","breaking":false,"risk":"low|medium|high","refs":[]}`
+
+Rules:
+
+- The JSON object must be a single line with no extra whitespace.
+- Keys must appear in the exact order shown.
+- Only the keys shown are allowed.
+- `schema` must be `cmsg/1`.
+- `type` must be one of `feat`, `fix`, `refactor`, `docs`, `chore`, `build`, `ci`, `perf`, or `revert`.
+- `scope` must be `global` or a lowercase kebab-case component name.
+- `summary`, `intent`, and `impact` must be short text without double quotes, backslashes, or newlines.
+- `breaking` must be `true` or `false`.
+- `risk` must be `low`, `medium`, or `high`.
+- `refs` must be an array of strings. Each string must use one of the following forms: `gh:<owner>/<repo>#<issue>`, `pr:<number>`, `doc:<slug>`, `url:<https://...>`. Use an empty array when there are no references.
+
 Commenting guidance:
 
 - Avoid redundant comments that restate the code in different words.
@@ -69,11 +90,11 @@ Run verification commands only when requested or when you need evidence before c
 - Use `cargo make` tasks from `Makefile.toml` when they are the best fit for the job.
 - Treat `Makefile.toml` as the source of truth for task names and behavior. Do not invent task names.
 - Preferred tasks for common workflows are listed below.
-    - Formatting: `cargo make fmt` or `cargo make fmt-check`.
-    - Linting: `cargo make lint` for full workspace, or `cargo make lint-rust` for Rust-only.
-    - Tests: `cargo make test` for full workspace, or `cargo make test-rust` for Rust-only.
-    - Full validation: `cargo make checks`.
-- Do not set `DATABASE_URL` manually when running `cargo make` tasks.
+  - Formatting: `cargo make fmt` or `cargo make fmt-check`.
+  - Linting: `cargo make lint` for full workspace, or `cargo make lint-rust` for Rust-only.
+  - Tests: `cargo make test` for full workspace, or `cargo make test-rust` for Rust-only.
+  - SQLx metadata: `scripts/sqlx-prepare.sh`.
+  - Full validation: `cargo make checks`.
 
 # 2. Implementation Scope
 
