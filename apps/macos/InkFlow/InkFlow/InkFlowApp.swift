@@ -17,12 +17,7 @@ struct InkFlowApp: App {
 			EmptyView()
 		}
 		.commands {
-			CommandGroup(replacing: .appSettings) {
-				Button("Settings...") {
-					appDelegate.toggleSettings()
-				}
-				.keyboardShortcut(",", modifiers: .command)
-			}
+			CommandGroup(replacing: .appSettings) {}
 		}
 	}
 }
@@ -32,8 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var statusItem: NSStatusItem?
 	private let panelController = PanelController()
 	private let viewModel = InkFlowViewModel()
+	private var hotkeyController: DictationHotkeyController?
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
+		_ = ConfigStore.shared
 		configureStatusItem()
 		let panel = FloatingPanel(
 			contentRect: NSRect(x: 0, y: 0, width: 720, height: 60),
@@ -78,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		NotificationCenter.default.addObserver(
 			self, selector: #selector(panelDidMove(_:)), name: NSWindow.didMoveNotification, object: panel)
 		panelController.syncPanelSize(animated: false)
+		hotkeyController = DictationHotkeyController(
+			viewModel: viewModel,
+			panelController: panelController,
+			config: ConfigStore.shared.current.dictation
+		)
+		hotkeyController?.start()
 	}
 
 	func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -123,12 +126,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 
 		let menu = NSMenu()
-		let settingsItem = NSMenuItem(
-			title: "Settings...", action: #selector(toggleSettings), keyEquivalent: ",")
-		settingsItem.keyEquivalentModifierMask = [.command]
-		settingsItem.target = self
-		menu.addItem(settingsItem)
-
 		let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
 		quitItem.keyEquivalentModifierMask = [.command]
 		quitItem.target = self

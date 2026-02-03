@@ -23,7 +23,9 @@ and metrics. Detailed ASR pipeline mechanics live in `docs/spec/core/`.
 
 - ASR output must not be inserted directly into the target application.
 - All ASR output is passed through an AI rewrite step before final delivery.
-- Users can toggle whether rewriting happens automatically after ASR completion.
+- Rewriting occurs only after dictation is complete; real-time rewriting is not used.
+- Automatic rewriting is controlled by a configuration toggle after ASR completion.
+- Detailed automatic rewrite behavior is deferred and tracked as an issue.
 
 ### Prompt configuration and merging
 
@@ -32,12 +34,11 @@ and metrics. Detailed ASR pipeline mechanics live in `docs/spec/core/`.
 - Per-application prompts and global style prompts must be merged for the rewrite request.
 - The input UI must allow fast switching between style prompts with smooth visual feedback.
 
-### Dictation method configuration
+### Dictation completion
 
-- The app must surface configuration for dictation method combinations defined in
-  `docs/spec/core/stt_dictation_pipeline.md`.
-- The UI should expose a clear selection for modes such as streaming-only, local two-pass,
-  and local one-shot.
+- The app must support a hold-to-talk mode where releasing the key ends dictation.
+- The app must support a press-to-toggle mode where the first press starts dictation and the
+  next press ends dictation.
 
 ## UI surfaces and navigation
 
@@ -58,7 +59,6 @@ and metrics. Detailed ASR pipeline mechanics live in `docs/spec/core/`.
   - Per-application rewrite prompts.
   - Global style prompt presets.
   - Shortcut bindings (e.g., open panel, toggle dictation).
-  - Dictation method configuration.
 
 ### History and metrics
 
@@ -68,9 +68,20 @@ and metrics. Detailed ASR pipeline mechanics live in `docs/spec/core/`.
   - Token consumption.
   - Total usage time.
   - Total ASR character/word count.
+- History retention defaults to indefinite storage, pending a later review of privacy and
+  cleanup controls.
 
 ## Open questions
 
 - Where should rewritten text be displayed before insertion: in the dictation panel, a
   secondary view, or a separate review area?
 - Should history and metrics live in a unified dashboard or separate views?
+
+## Deferred items (track as issues)
+
+- Define the rewrite presentation surface and interaction model.
+- Defer the history experience implementation details.
+- Finalize the automatic rewrite behavior for each dictation mode.
+- Decide how to expose dictation method configuration (streaming-only, local two-pass, local
+  one-shot) in settings.
+- Revisit retention policy, privacy messaging, and cleanup controls.

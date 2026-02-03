@@ -2,17 +2,14 @@ import SwiftUI
 
 struct AppearanceReader<Content: View>: View {
 	let content: (AppearanceStyle) -> Content
-	@AppStorage("appearance.theme") private var themeRaw = ThemePreference.system.rawValue
-	@AppStorage("appearance.accent") private var accentRaw = AccentOption.sky.rawValue
-	@AppStorage("appearance.glassIntensity") private var glassIntensityRaw = GlassIntensity.standard.rawValue
-	@AppStorage("appearance.windowTranslucency") private var isWindowTranslucent = true
 
 	private var appearance: AppearanceStyle {
+		let appearanceConfig = ConfigStore.shared.current.appearance
 		AppearanceStyle(
-			theme: AppearanceStyle.theme(from: themeRaw),
-			accent: AppearanceStyle.accent(from: accentRaw),
-			glassIntensity: AppearanceStyle.glassIntensity(from: glassIntensityRaw),
-			isTranslucent: isWindowTranslucent
+			theme: AppearanceStyle.theme(from: appearanceConfig.theme),
+			accent: AppearanceStyle.accent(from: appearanceConfig.accent),
+			glassIntensity: AppearanceStyle.glassIntensity(from: appearanceConfig.glassIntensity),
+			isTranslucent: appearanceConfig.isWindowTranslucent
 		)
 	}
 
