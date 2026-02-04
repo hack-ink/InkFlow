@@ -58,6 +58,10 @@ impl InkFlowEngine {
 		self.pipeline.submit_audio(samples, sample_rate_hz)
 	}
 
+	pub fn force_finalize(&self) -> Result<(), AppError> {
+		self.pipeline.force_finalize()
+	}
+
 	pub fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
 		self.pipeline.poll_update()
 	}

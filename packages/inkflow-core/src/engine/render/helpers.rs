@@ -1,5 +1,4 @@
-use crate::{domain, stt};
-use crate::engine::text;
+use crate::{domain, engine::text, stt};
 
 pub(super) fn window_tail_text(
 	snapshot: &stt::WindowJobSnapshot,

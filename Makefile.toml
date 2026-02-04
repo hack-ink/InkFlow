@@ -212,8 +212,9 @@ workspace = false
 command = "swift"
 args = [
 	"format",
+	"lint",
+	"--strict",
 	"--recursive",
-	"--lint",
 	"--configuration",
 	".swift-format",
 	"apps/macos/InkFlow/InkFlow",

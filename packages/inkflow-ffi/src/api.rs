@@ -1,19 +1,16 @@
 use std::{
 	os::raw::c_void,
 	ptr,
-	sync::{
-		Arc, Mutex,
-		atomic::AtomicBool,
-	},
+	sync::{Arc, Mutex, atomic::AtomicBool},
 	thread,
 };
 
 use inkflow_core::{AppError, InkFlowEngine, SttSettings};
 
-use crate::callbacks::{callback_loop, stop_callback, stop_callback_inner};
-use crate::logging;
-use crate::types::{
-	CallbackState, InkFlowHandle, InkFlowStatus, InkFlowUpdateCallback, UserData,
+use crate::{
+	callbacks::{callback_loop, stop_callback, stop_callback_inner},
+	logging,
+	types::{CallbackState, InkFlowHandle, InkFlowStatus, InkFlowUpdateCallback, UserData},
 };
 
 #[unsafe(no_mangle)]
@@ -53,9 +50,10 @@ pub unsafe extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
 	};
 
 	if let Some(engine) = guard.take()
-		&& let Err(err) = engine.stop() {
-			tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
-		}
+		&& let Err(err) = engine.stop()
+	{
+		tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
+	}
 }
 
 #[unsafe(no_mangle)]
@@ -89,6 +87,29 @@ pub unsafe extern "C" fn inkflow_engine_submit_audio(
 	};
 
 	match engine.submit_audio(slice, sample_rate_hz) {
+		Ok(()) => InkFlowStatus::Ok.code(),
+		Err(err) => map_error_status(&err).code(),
+	}
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// The caller must pass a valid pointer returned by `inkflow_engine_create`.
+pub unsafe extern "C" fn inkflow_engine_force_finalize(handle: *mut InkFlowHandle) -> i32 {
+	if handle.is_null() {
+		return InkFlowStatus::Null.code();
+	}
+
+	let engine = unsafe { &*handle }.engine.clone();
+	let guard = match engine.lock() {
+		Ok(guard) => guard,
+		Err(_) => return InkFlowStatus::InternalError.code(),
+	};
+	let Some(engine) = guard.as_ref() else {
+		return InkFlowStatus::InternalError.code();
+	};
+
+	match engine.force_finalize() {
 		Ok(()) => InkFlowStatus::Ok.code(),
 		Err(err) => map_error_status(&err).code(),
 	}
@@ -151,5 +172,16 @@ fn map_error_status(err: &AppError) -> InkFlowStatus {
 	match err.code.as_str() {
 		"audio_invalid" | "settings_invalid" => InkFlowStatus::InvalidArgument,
 		_ => InkFlowStatus::InternalError,
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn force_finalize_returns_null_when_handle_missing() {
+		let status = unsafe { inkflow_engine_force_finalize(ptr::null_mut()) };
+		assert_eq!(status, InkFlowStatus::Null.code());
 	}
 }

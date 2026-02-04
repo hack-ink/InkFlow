@@ -35,16 +35,16 @@ struct AppConfig {
 	)
 
 	static let defaultToml = """
-	[appearance]
-	theme = "system"
-	accent = "sky"
-	glass_intensity = "standard"
-	window_translucency = true
+		[appearance]
+		theme = "system"
+		accent = "sky"
+		glass_intensity = "standard"
+		window_translucency = true
 
-	[dictation]
-	activation_mode = "hold"
-	hotkey = "fn"
-	"""
+		[dictation]
+		activation_mode = "hold"
+		hotkey = "fn"
+		"""
 
 	init(parsed: TomlDictionary) {
 		let appearance = Self.parseAppearance(from: parsed)

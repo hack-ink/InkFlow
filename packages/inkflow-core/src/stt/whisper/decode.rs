@@ -2,8 +2,10 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 
 use crate::error::AppError;
 
-use super::config::{WhisperConfig, WhisperDecodeProfile};
-use super::text::append_trimmed_text;
+use super::{
+	config::{WhisperConfig, WhisperDecodeProfile},
+	text::append_trimmed_text,
+};
 
 #[derive(Clone, Debug)]
 pub struct WhisperDecodedSegment {

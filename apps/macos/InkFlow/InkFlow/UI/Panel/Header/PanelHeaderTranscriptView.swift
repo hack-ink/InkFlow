@@ -43,7 +43,7 @@ private struct PanelHeaderWaveformBackdrop: View {
 				.clear,
 				.white.opacity(PanelHeaderLayout.waveformMaskOpacity),
 				.white.opacity(PanelHeaderLayout.waveformMaskOpacity),
-				.clear
+				.clear,
 			],
 			startPoint: .leading,
 			endPoint: .trailing

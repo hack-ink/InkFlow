@@ -13,7 +13,7 @@ use super::{
 	modes::{DecodeMode, InferenceMode, PipelinePlan},
 	queue::SecondPassQueue,
 	render::RenderState,
-	worker::{SpeechActivity, WhisperJob, spawn_asr_worker, spawn_whisper_worker},
+	worker::{SpeechActivity, StreamCommand, WhisperJob, spawn_asr_worker, spawn_whisper_worker},
 };
 
 pub(crate) enum SttPipeline {
@@ -42,6 +42,12 @@ impl SttPipeline {
 		}
 	}
 
+	pub(crate) fn force_finalize(&self) -> Result<(), AppError> {
+		match self {
+			SttPipeline::LocalStreamSecondPass(pipeline) => pipeline.force_finalize(),
+		}
+	}
+
 	pub(crate) fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
 		match self {
 			SttPipeline::LocalStreamSecondPass(pipeline) => pipeline.poll_update(),
@@ -58,8 +64,8 @@ impl SttPipeline {
 pub(crate) struct LocalStreamSecondPassPipeline {
 	runtime: tokio::runtime::Runtime,
 	cancel: CancellationToken,
-	audio_tx: mpsc::Sender<Vec<f32>>,
-	audio_rx: Mutex<Option<mpsc::Receiver<Vec<f32>>>>,
+	audio_tx: mpsc::Sender<StreamCommand>,
+	audio_rx: Mutex<Option<mpsc::Receiver<StreamCommand>>>,
 	raw_update_tx: mpsc::Sender<AsrUpdate>,
 	raw_update_rx: Mutex<mpsc::Receiver<AsrUpdate>>,
 	second_pass_queue: Arc<SecondPassQueue>,
@@ -106,7 +112,7 @@ impl LocalStreamSecondPassPipeline {
 		const UPDATE_QUEUE_CAPACITY: usize = 64;
 		const WINDOW_QUEUE_CAPACITY: usize = 2;
 
-		let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>(AUDIO_QUEUE_CAPACITY);
+		let (audio_tx, audio_rx) = mpsc::channel::<StreamCommand>(AUDIO_QUEUE_CAPACITY);
 		let (raw_update_tx, raw_update_rx) = mpsc::channel::<AsrUpdate>(UPDATE_QUEUE_CAPACITY);
 		let second_pass_queue =
 			Arc::new(SecondPassQueue::new(stt_settings.second_pass_queue_capacity));
@@ -164,8 +170,29 @@ impl LocalStreamSecondPassPipeline {
 		self.ensure_asr_worker(sample_rate_hz)?;
 
 		self.audio_tx
-			.blocking_send(samples.to_vec())
+			.blocking_send(StreamCommand::Audio(samples.to_vec()))
 			.map_err(|_| AppError::new("audio_send_failed", "Failed to submit audio buffer."))
+	}
+
+	fn force_finalize(&self) -> Result<(), AppError> {
+		let has_worker = {
+			let guard = self
+				.asr_handle
+				.lock()
+				.map_err(|_| AppError::new("stt_task_failed", "ASR task state is unavailable."))?;
+			guard.is_some()
+		};
+
+		if !has_worker {
+			let _ = self
+				.raw_update_tx
+				.blocking_send(AsrUpdate::EndpointReset { window_generation_after: 1 });
+			return Ok(());
+		}
+
+		self.audio_tx
+			.blocking_send(StreamCommand::Finalize)
+			.map_err(|_| AppError::new("audio_send_failed", "Failed to submit finalize signal."))
 	}
 
 	fn poll_update(&self) -> Result<Option<AsrUpdate>, AppError> {
@@ -215,19 +242,20 @@ impl LocalStreamSecondPassPipeline {
 		drop(self.audio_tx);
 
 		if let Ok(mut handle) = self.asr_handle.lock()
-			&& let Some(handle) = handle.take() {
-				let result = self.runtime.block_on(handle);
-				match result {
-					Ok(Ok(())) => {},
-					Ok(Err(err)) => return Err(err),
-					Err(err) => {
-						return Err(AppError::new(
-							"stt_task_failed",
-							format!("The STT task failed: {err}."),
-						));
-					},
-				}
+			&& let Some(handle) = handle.take()
+		{
+			let result = self.runtime.block_on(handle);
+			match result {
+				Ok(Ok(())) => {},
+				Ok(Err(err)) => return Err(err),
+				Err(err) => {
+					return Err(AppError::new(
+						"stt_task_failed",
+						format!("The STT task failed: {err}."),
+					));
+				},
 			}
+		}
 
 		let result = self.runtime.block_on(self.whisper_handle);
 		if let Err(err) = result {

@@ -5,9 +5,20 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{error::AppError, settings::SttSettings, stt};
 
-use crate::engine::{AsrUpdate, queue::SecondPassQueue, state::{SegmentState, WindowState}};
-use super::audio::{SpeechActivity, WhisperJob, ms_to_samples};
-use super::second_pass::SecondPassScheduler;
+use super::{
+	audio::{SpeechActivity, WhisperJob, ms_to_samples},
+	second_pass::SecondPassScheduler,
+};
+use crate::engine::{
+	AsrUpdate,
+	queue::SecondPassQueue,
+	state::{SegmentState, WindowState},
+};
+
+pub(crate) enum StreamCommand {
+	Audio(Vec<f32>),
+	Finalize,
+}
 
 struct StreamWorker {
 	cancel: CancellationToken,
@@ -16,7 +27,7 @@ struct StreamWorker {
 	stream: sherpa_onnx::OnlineStream,
 	sample_rate: u32,
 	engine_generation: u64,
-	audio_rx: mpsc::Receiver<Vec<f32>>,
+	audio_rx: mpsc::Receiver<StreamCommand>,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_queue: Arc<SecondPassQueue>,
 	speech_activity: Arc<SpeechActivity>,
@@ -34,27 +45,44 @@ impl StreamWorker {
 		let mut pending: Vec<f32> = Vec::new();
 		let mut pending_start: usize = 0;
 
-		while let Some(chunk) = self.audio_rx.blocking_recv() {
+		while let Some(command) = self.audio_rx.blocking_recv() {
 			if self.cancel.is_cancelled() {
 				return Ok(());
 			}
 
-			pending.extend_from_slice(&chunk);
+			match command {
+				StreamCommand::Audio(chunk) => {
+					pending.extend_from_slice(&chunk);
 
-			while pending.len().saturating_sub(pending_start) >= self.samples_per_read {
-				let end = pending_start.saturating_add(self.samples_per_read);
-				self.process_samples(&pending[pending_start..end])?;
-				pending_start = end;
+					while pending.len().saturating_sub(pending_start) >= self.samples_per_read {
+						let end = pending_start.saturating_add(self.samples_per_read);
+						let _ = self.process_samples(&pending[pending_start..end])?;
+						pending_start = end;
 
-				if pending_start >= 8_192 && pending_start >= pending.len().saturating_div(2) {
-					pending.drain(..pending_start);
+						if pending_start >= 8_192
+							&& pending_start >= pending.len().saturating_div(2)
+						{
+							pending.drain(..pending_start);
+							pending_start = 0;
+						}
+					}
+				},
+				StreamCommand::Finalize => {
+					let mut endpoint_emitted = false;
+					if pending_start < pending.len() {
+						endpoint_emitted = self.process_samples(&pending[pending_start..])?;
+					}
+					pending.clear();
 					pending_start = 0;
-				}
+					if !endpoint_emitted {
+						self.force_finalize()?;
+					}
+				},
 			}
 		}
 
 		if pending_start < pending.len() {
-			self.process_samples(&pending[pending_start..])?;
+			let _ = self.process_samples(&pending[pending_start..])?;
 		}
 
 		if self.cancel.is_cancelled() {
@@ -65,11 +93,11 @@ impl StreamWorker {
 		Ok(())
 	}
 
-	fn process_samples(&mut self, samples: &[f32]) -> Result<(), AppError> {
+	fn process_samples(&mut self, samples: &[f32]) -> Result<bool, AppError> {
 		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
 
 		if self.cancel.is_cancelled() || samples.is_empty() {
-			return Ok(());
+			return Ok(false);
 		}
 
 		self.append_pending_tail(samples);
@@ -128,10 +156,10 @@ impl StreamWorker {
 
 		if self.stream.is_endpoint() {
 			let sherpa_text = if text.is_empty() { self.last_text.clone() } else { text };
-			self.handle_endpoint(&sherpa_text)?;
+			return self.handle_endpoint(&sherpa_text);
 		}
 
-		Ok(())
+		Ok(false)
 	}
 
 	fn maybe_emit_partial(&mut self, text: &str) {
@@ -150,7 +178,7 @@ impl StreamWorker {
 		let _ = self.update_tx.blocking_send(AsrUpdate::SherpaPartial(self.last_text.clone()));
 	}
 
-	fn handle_endpoint(&mut self, sherpa_text: &str) -> Result<(), AppError> {
+	fn handle_endpoint(&mut self, sherpa_text: &str) -> Result<bool, AppError> {
 		self.flush_pending_second_pass(true);
 		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
 		let window_generation_after = self.window_state.advance_generation();
@@ -161,7 +189,7 @@ impl StreamWorker {
 			self.segment_state.reset();
 			self.last_text.clear();
 			self.stream.reset();
-			return Ok(());
+			return Ok(true);
 		}
 
 		let segment_id = self.segment_state.next_segment_id();
@@ -183,7 +211,7 @@ impl StreamWorker {
 
 		self.last_text.clear();
 		self.stream.reset();
-		Ok(())
+		Ok(true)
 	}
 
 	fn finalize_stream(&mut self) -> Result<(), AppError> {
@@ -215,8 +243,7 @@ impl StreamWorker {
 			)
 		})?;
 
-		let final_text = result.text.trim().to_string();
-		let fallback_text = if final_text.is_empty() { self.last_text.clone() } else { final_text };
+		let fallback_text = forced_finalize_fallback_text(&result.text, &self.last_text);
 
 		if self.segment_state.is_empty() {
 			return Ok(());
@@ -252,13 +279,85 @@ impl StreamWorker {
 		Ok(())
 	}
 
+	fn force_finalize(&mut self) -> Result<(), AppError> {
+		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
+		const TAIL_PADDING_MS: u64 = 300;
+
+		self.flush_pending_second_pass(true);
+
+		let tail_samples = (self.sample_rate as u64)
+			.saturating_mul(TAIL_PADDING_MS)
+			.saturating_div(1_000) as usize;
+		if tail_samples > 0 {
+			let tail = vec![0.0f32; tail_samples];
+			let tail_16k_samples = (SHERPA_SAMPLE_RATE_HZ as u64)
+				.saturating_mul(TAIL_PADDING_MS)
+				.saturating_div(1_000) as usize;
+			if tail_16k_samples > 0 {
+				let tail_16k = vec![0.0f32; tail_16k_samples];
+				self.stream.accept_waveform(SHERPA_SAMPLE_RATE_HZ as i32, &tail_16k);
+			}
+			self.segment_state.push_samples(&tail);
+		}
+
+		self.stream.input_finished();
+		self.recognizer.decode(&self.stream);
+
+		let result = self.recognizer.result_json(&self.stream).map_err(|err| {
+			AppError::new(
+				"stt_decode_failed",
+				format!("Failed to decode audio with sherpa-onnx: {err}."),
+			)
+		})?;
+
+		let fallback_text = forced_finalize_fallback_text(&result.text, &self.last_text);
+		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
+		let should_emit_segment = forced_finalize_should_emit_segment(has_voice, &fallback_text);
+		let window_generation_after = self.window_state.advance_generation();
+		let (segment_id, committed_end_16k_samples) = if should_emit_segment {
+			(self.segment_state.next_segment_id(), self.window_state.total_16k_samples())
+		} else {
+			(0, 0)
+		};
+		let update = forced_finalize_update(
+			should_emit_segment,
+			segment_id,
+			&fallback_text,
+			committed_end_16k_samples,
+			window_generation_after,
+		);
+		let is_reset = matches!(update, AsrUpdate::EndpointReset { .. });
+		let _ = self.update_tx.blocking_send(update);
+		if is_reset {
+			self.segment_state.reset();
+			self.last_text.clear();
+			self.stream.reset();
+			return Ok(());
+		}
+
+		let (segment_samples, peak_mean_abs) = self.segment_state.take();
+		tracing::info!(
+			segment_id,
+			samples = segment_samples.len(),
+			peak_mean_abs,
+			"Segment committed."
+		);
+		self.schedule_second_pass(segment_id, segment_samples, peak_mean_abs);
+		self.flush_pending_second_pass(true);
+
+		self.segment_state.reset();
+		self.last_text.clear();
+		self.stream.reset();
+		Ok(())
+	}
+
 	fn append_pending_tail(&mut self, samples: &[f32]) {
 		if let Some(job) = self.second_pass.append_tail(samples)
 			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn schedule_second_pass(
@@ -276,21 +375,20 @@ impl StreamWorker {
 			segment_samples,
 			peak_mean_abs,
 			tail_samples,
-		)
-			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
-				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		) && let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+			job
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn flush_pending_second_pass(&mut self, force: bool) {
 		if let Some(job) = self.second_pass.flush(force)
 			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn enqueue_second_pass(
@@ -323,7 +421,7 @@ pub(crate) fn spawn_asr_worker(
 	stream: sherpa_onnx::OnlineStream,
 	sample_rate: u32,
 	engine_generation: u64,
-	audio_rx: mpsc::Receiver<Vec<f32>>,
+	audio_rx: mpsc::Receiver<StreamCommand>,
 	update_tx: mpsc::Sender<AsrUpdate>,
 	second_pass_queue: Arc<SecondPassQueue>,
 	speech_activity: Arc<SpeechActivity>,
@@ -360,4 +458,60 @@ pub(crate) fn spawn_asr_worker(
 
 		worker.run()
 	})
+}
+
+fn forced_finalize_fallback_text(final_text: &str, last_text: &str) -> String {
+	let trimmed = final_text.trim();
+	if trimmed.is_empty() { last_text.trim().to_string() } else { trimmed.to_string() }
+}
+
+fn forced_finalize_should_emit_segment(has_voice: bool, fallback_text: &str) -> bool {
+	has_voice && !fallback_text.trim().is_empty()
+}
+
+fn forced_finalize_update(
+	should_emit_segment: bool,
+	segment_id: u64,
+	fallback_text: &str,
+	committed_end_16k_samples: u64,
+	window_generation_after: u64,
+) -> AsrUpdate {
+	if !should_emit_segment {
+		return AsrUpdate::EndpointReset { window_generation_after };
+	}
+
+	AsrUpdate::SegmentEnd {
+		segment_id,
+		sherpa_text: fallback_text.to_string(),
+		committed_end_16k_samples,
+		window_generation_after,
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn forced_finalize_fallback_text_uses_last_text_when_final_empty() {
+		let resolved = forced_finalize_fallback_text("", "hello");
+		assert_eq!(resolved, "hello");
+	}
+	#[test]
+	fn forced_finalize_emits_endpoint_reset_when_no_audio() {
+		let update = forced_finalize_update(false, 0, "", 0, 1);
+		assert!(matches!(update, AsrUpdate::EndpointReset { window_generation_after: 1 }));
+	}
+	#[test]
+	fn forced_finalize_update_emits_segment_end_when_valid() {
+		let update = forced_finalize_update(true, 7, "hello", 1_600, 2);
+		assert!(matches!(
+			update,
+			AsrUpdate::SegmentEnd {
+				segment_id: 7,
+				sherpa_text,
+				committed_end_16k_samples: 1_600,
+				window_generation_after: 2,
+			} if sherpa_text == "hello"
+		));
+	}
 }

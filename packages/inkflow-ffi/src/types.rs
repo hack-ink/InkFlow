@@ -1,9 +1,6 @@
 use std::{
 	os::raw::{c_char, c_void},
-	sync::{
-		Arc, Mutex,
-		atomic::AtomicBool,
-	},
+	sync::{Arc, Mutex, atomic::AtomicBool},
 	thread,
 };
 
