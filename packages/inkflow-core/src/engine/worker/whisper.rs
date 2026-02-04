@@ -5,8 +5,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{domain, settings::SttSettings, stt};
 
-use crate::engine::{AsrUpdate, queue::SecondPassQueue};
 use super::audio::{ActivityGate, SpeechActivity, WhisperJob, activity_metrics, audio_hash};
+use crate::engine::{AsrUpdate, queue::SecondPassQueue};
 
 struct WhisperWorker {
 	cancel: CancellationToken,

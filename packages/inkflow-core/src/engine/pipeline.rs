@@ -184,9 +184,9 @@ impl LocalStreamSecondPassPipeline {
 		};
 
 		if !has_worker {
-			let _ = self.raw_update_tx.blocking_send(AsrUpdate::EndpointReset {
-				window_generation_after: 1,
-			});
+			let _ = self
+				.raw_update_tx
+				.blocking_send(AsrUpdate::EndpointReset { window_generation_after: 1 });
 			return Ok(());
 		}
 
@@ -242,19 +242,20 @@ impl LocalStreamSecondPassPipeline {
 		drop(self.audio_tx);
 
 		if let Ok(mut handle) = self.asr_handle.lock()
-			&& let Some(handle) = handle.take() {
-				let result = self.runtime.block_on(handle);
-				match result {
-					Ok(Ok(())) => {},
-					Ok(Err(err)) => return Err(err),
-					Err(err) => {
-						return Err(AppError::new(
-							"stt_task_failed",
-							format!("The STT task failed: {err}."),
-						));
-					},
-				}
+			&& let Some(handle) = handle.take()
+		{
+			let result = self.runtime.block_on(handle);
+			match result {
+				Ok(Ok(())) => {},
+				Ok(Err(err)) => return Err(err),
+				Err(err) => {
+					return Err(AppError::new(
+						"stt_task_failed",
+						format!("The STT task failed: {err}."),
+					));
+				},
 			}
+		}
 
 		let result = self.runtime.block_on(self.whisper_handle);
 		if let Err(err) = result {

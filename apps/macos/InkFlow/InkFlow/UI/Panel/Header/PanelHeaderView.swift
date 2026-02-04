@@ -14,9 +14,9 @@ struct PanelHeaderView: View {
 		.frame(maxWidth: .infinity, alignment: .leading)
 		.frame(height: PanelHeaderLayout.rowHeight, alignment: .center)
 		.textSelection(.disabled)
-			.preferredColorScheme(appearance.preferredColorScheme)
-			.tint(appearance.accentColor)
-			.onExitCommand { panelController.handleExitCommand() }
+		.preferredColorScheme(appearance.preferredColorScheme)
+		.tint(appearance.accentColor)
+		.onExitCommand { panelController.handleExitCommand() }
 	}
 
 	private func toggleListening() {

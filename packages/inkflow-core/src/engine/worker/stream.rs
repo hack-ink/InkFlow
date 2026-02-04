@@ -5,9 +5,15 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{error::AppError, settings::SttSettings, stt};
 
-use crate::engine::{AsrUpdate, queue::SecondPassQueue, state::{SegmentState, WindowState}};
-use super::audio::{SpeechActivity, WhisperJob, ms_to_samples};
-use super::second_pass::SecondPassScheduler;
+use super::{
+	audio::{SpeechActivity, WhisperJob, ms_to_samples},
+	second_pass::SecondPassScheduler,
+};
+use crate::engine::{
+	AsrUpdate,
+	queue::SecondPassQueue,
+	state::{SegmentState, WindowState},
+};
 
 pub(crate) enum StreamCommand {
 	Audio(Vec<f32>),
@@ -53,7 +59,9 @@ impl StreamWorker {
 						let _ = self.process_samples(&pending[pending_start..end])?;
 						pending_start = end;
 
-						if pending_start >= 8_192 && pending_start >= pending.len().saturating_div(2) {
+						if pending_start >= 8_192
+							&& pending_start >= pending.len().saturating_div(2)
+						{
 							pending.drain(..pending_start);
 							pending_start = 0;
 						}
@@ -307,10 +315,7 @@ impl StreamWorker {
 		let should_emit_segment = forced_finalize_should_emit_segment(has_voice, &fallback_text);
 		let window_generation_after = self.window_state.advance_generation();
 		let (segment_id, committed_end_16k_samples) = if should_emit_segment {
-			(
-				self.segment_state.next_segment_id(),
-				self.window_state.total_16k_samples(),
-			)
+			(self.segment_state.next_segment_id(), self.window_state.total_16k_samples())
 		} else {
 			(0, 0)
 		};
@@ -350,9 +355,9 @@ impl StreamWorker {
 		if let Some(job) = self.second_pass.append_tail(samples)
 			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn schedule_second_pass(
@@ -370,21 +375,20 @@ impl StreamWorker {
 			segment_samples,
 			peak_mean_abs,
 			tail_samples,
-		)
-			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
-				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		) && let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
+			job
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn flush_pending_second_pass(&mut self, force: bool) {
 		if let Some(job) = self.second_pass.flush(force)
 			&& let WhisperJob::SecondPass { segment_id, sample_rate_hz, samples, peak_mean_abs } =
 				job
-			{
-				self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
-			}
+		{
+			self.enqueue_second_pass(segment_id, sample_rate_hz, samples, peak_mean_abs);
+		}
 	}
 
 	fn enqueue_second_pass(
@@ -458,13 +462,8 @@ pub(crate) fn spawn_asr_worker(
 
 fn forced_finalize_fallback_text(final_text: &str, last_text: &str) -> String {
 	let trimmed = final_text.trim();
-	if trimmed.is_empty() {
-		last_text.trim().to_string()
-	} else {
-		trimmed.to_string()
-	}
+	if trimmed.is_empty() { last_text.trim().to_string() } else { trimmed.to_string() }
 }
-
 
 fn forced_finalize_should_emit_segment(has_voice: bool, fallback_text: &str) -> bool {
 	has_voice && !fallback_text.trim().is_empty()

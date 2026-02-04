@@ -104,7 +104,7 @@ enum KeyCodeMap {
 		"j": 38,
 		"k": 40,
 		"n": 45,
-		"m": 46
+		"m": 46,
 	]
 
 	static func keyCode(for token: String) -> UInt16? {

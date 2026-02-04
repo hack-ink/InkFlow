@@ -100,7 +100,8 @@ impl ActivityGate {
 			self.min_mean_abs > 0.0 && metrics.mean_abs >= self.min_mean_abs * ENERGY_BOOST;
 		let rms_boost = self.min_rms > 0.0 && metrics.rms >= self.min_rms * ENERGY_BOOST;
 		let band_ok = metrics.band_energy_ratio >= self.min_band_energy_ratio;
-		let low_noise = metrics.zero_crossing_rate <= self.max_zero_crossing_rate * ZCR_RELAX_FACTOR;
+		let low_noise =
+			metrics.zero_crossing_rate <= self.max_zero_crossing_rate * ZCR_RELAX_FACTOR;
 
 		band_ok || (low_noise && energy_relaxed) || mean_boost || rms_boost
 	}

@@ -95,10 +95,7 @@ mod tests {
 
 	#[test]
 	fn second_pass_queue_capacity_must_be_positive() {
-		let settings = SttSettings {
-			second_pass_queue_capacity: 0,
-			..Default::default()
-		};
+		let settings = SttSettings { second_pass_queue_capacity: 0, ..Default::default() };
 		assert!(settings.validate().is_err());
 	}
 }

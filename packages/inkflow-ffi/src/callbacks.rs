@@ -11,8 +11,10 @@ use std::{
 
 use inkflow_core::InkFlowEngine;
 
-use crate::json::{error_json, update_to_json};
-use crate::types::{CallbackState, UserData};
+use crate::{
+	json::{error_json, update_to_json},
+	types::{CallbackState, UserData},
+};
 
 pub(crate) fn stop_callback(lock: &Mutex<Option<CallbackState>>) {
 	if let Ok(mut guard) = lock.lock() {

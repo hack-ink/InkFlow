@@ -1,19 +1,16 @@
 use std::{
 	os::raw::c_void,
 	ptr,
-	sync::{
-		Arc, Mutex,
-		atomic::AtomicBool,
-	},
+	sync::{Arc, Mutex, atomic::AtomicBool},
 	thread,
 };
 
 use inkflow_core::{AppError, InkFlowEngine, SttSettings};
 
-use crate::callbacks::{callback_loop, stop_callback, stop_callback_inner};
-use crate::logging;
-use crate::types::{
-	CallbackState, InkFlowHandle, InkFlowStatus, InkFlowUpdateCallback, UserData,
+use crate::{
+	callbacks::{callback_loop, stop_callback, stop_callback_inner},
+	logging,
+	types::{CallbackState, InkFlowHandle, InkFlowStatus, InkFlowUpdateCallback, UserData},
 };
 
 #[unsafe(no_mangle)]
@@ -53,9 +50,10 @@ pub unsafe extern "C" fn inkflow_engine_destroy(handle: *mut InkFlowHandle) {
 	};
 
 	if let Some(engine) = guard.take()
-		&& let Err(err) = engine.stop() {
-			tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
-		}
+		&& let Err(err) = engine.stop()
+	{
+		tracing::error!(error = %err.message, "InkFlow engine shutdown failed.");
+	}
 }
 
 #[unsafe(no_mangle)]

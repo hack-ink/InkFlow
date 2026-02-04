@@ -3,8 +3,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use crate::{AsrUpdate, domain, settings::SttSettings, stt};
-use crate::engine::text;
+use crate::{AsrUpdate, domain, engine::text, settings::SttSettings, stt};
 
 use super::helpers::{render_preview, window_tail_text};
 
@@ -28,11 +27,11 @@ pub(crate) struct RenderState {
 
 impl RenderState {
 	pub(crate) fn new() -> Self {
-			Self {
-				merge: domain::MergeState::default(),
-				last_window_end_16k: 0,
-				committed_end_16k: 0,
-				current_window_generation: 0,
+		Self {
+			merge: domain::MergeState::default(),
+			last_window_end_16k: 0,
+			committed_end_16k: 0,
+			current_window_generation: 0,
 			last_window_update: None,
 			last_sherpa_partial: String::new(),
 			live_tail: String::new(),
