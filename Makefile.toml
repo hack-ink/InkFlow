@@ -10,7 +10,9 @@
 
 [tasks.dev]
 workspace = false
-dependencies = ["setup-macos"]
+dependencies = [
+	"setup-macos",
+]
 command = "bash"
 args = [
 	"-lc",
@@ -19,7 +21,9 @@ args = [
 
 [tasks.release]
 workspace = false
-dependencies = ["setup-macos"]
+dependencies = [
+	"setup-macos",
+]
 command = "bash"
 args = [
 	"-lc",
@@ -28,7 +32,9 @@ args = [
 
 [tasks.stt-compare]
 workspace = false
-dependencies = ["setup-macos"]
+dependencies = [
+	"setup-macos",
+]
 command = "bash"
 args = [
 	"-lc",
@@ -37,7 +43,9 @@ args = [
 
 [tasks.stt-compare-mic]
 workspace = false
-dependencies = ["setup-macos"]
+dependencies = [
+	"setup-macos",
+]
 command = "bash"
 args = [
 	"-lc",
@@ -124,7 +132,9 @@ args = [
 
 [tasks.test]
 workspace = false
-dependencies = ["test-rust"]
+dependencies = [
+	"test-rust",
+]
 
 [tasks.test-rust]
 workspace = false
@@ -212,7 +222,9 @@ args = [
 [tasks.fmt-taplo]
 workspace = false
 command = "taplo"
-args = ["fmt"]
+args = [
+	"fmt",
+]
 
 [tasks.fmt-taplo-check]
 extend = "fmt-taplo"
