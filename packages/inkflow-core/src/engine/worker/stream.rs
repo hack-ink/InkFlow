@@ -467,7 +467,6 @@ mod tests {
 		let resolved = forced_finalize_fallback_text("", "hello");
 		assert_eq!(resolved, "hello");
 	}
-
 	#[test]
 	fn forced_finalize_emits_endpoint_reset_when_no_audio() {
 		let outcome = forced_finalize_should_emit_segment(false, "");
