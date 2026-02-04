@@ -18,6 +18,7 @@ final class InkFlowViewModel: ObservableObject {
 	private let client: InkFlowClient?
 	private var lastWaveformUpdate: TimeInterval = 0
 	private var lastWaveformLevel: CGFloat = InkFlowViewModel.waveformFloor
+	private var pendingFinalize = false
 	private let waveformUpdateInterval: TimeInterval = 0.02
 	private static let waveformFloor: CGFloat = 0.04
 	private static let waveformScale: CGFloat = 28.0
@@ -63,7 +64,11 @@ final class InkFlowViewModel: ObservableObject {
 			return
 		}
 		audioCapture.stop()
-		client?.unregisterUpdates()
+		let finalizeSucceeded = client?.forceFinalize() ?? false
+		pendingFinalize = finalizeSucceeded
+		if !finalizeSucceeded {
+			client?.unregisterUpdates()
+		}
 		isListening = false
 		status = "Stopped"
 		resetWaveform()
@@ -122,6 +127,15 @@ final class InkFlowViewModel: ObservableObject {
 	}
 
 	private func handleUpdate(_ update: InkFlowUpdate) {
+		if pendingFinalize {
+			switch update.kind {
+			case "segment_end", "endpoint_reset", "error":
+				pendingFinalize = false
+				client?.unregisterUpdates()
+			default:
+				break
+			}
+		}
 		switch update.kind {
 		case "live_render":
 			transcript = update.text ?? ""

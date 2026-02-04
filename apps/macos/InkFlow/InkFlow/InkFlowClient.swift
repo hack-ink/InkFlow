@@ -73,6 +73,14 @@ final class InkFlowClient {
 		return result == INKFLOW_OK
 	}
 
+	func forceFinalize() -> Bool {
+		guard let handle else {
+			return false
+		}
+		let result = inkflow_engine_force_finalize(handle)
+		return result == INKFLOW_OK
+	}
+
 	func stop() {
 		unregisterUpdates()
 		if let handle {
