@@ -50,7 +50,7 @@ impl StreamWorker {
 
 					while pending.len().saturating_sub(pending_start) >= self.samples_per_read {
 						let end = pending_start.saturating_add(self.samples_per_read);
-						self.process_samples(&pending[pending_start..end])?;
+						let _ = self.process_samples(&pending[pending_start..end])?;
 						pending_start = end;
 
 						if pending_start >= 8_192 && pending_start >= pending.len().saturating_div(2) {
@@ -60,18 +60,21 @@ impl StreamWorker {
 					}
 				},
 				StreamCommand::Finalize => {
+					let mut endpoint_emitted = false;
 					if pending_start < pending.len() {
-						self.process_samples(&pending[pending_start..])?;
+						endpoint_emitted = self.process_samples(&pending[pending_start..])?;
 					}
 					pending.clear();
 					pending_start = 0;
-					self.force_finalize()?;
+					if !endpoint_emitted {
+						self.force_finalize()?;
+					}
 				},
 			}
 		}
 
 		if pending_start < pending.len() {
-			self.process_samples(&pending[pending_start..])?;
+			let _ = self.process_samples(&pending[pending_start..])?;
 		}
 
 		if self.cancel.is_cancelled() {
@@ -82,11 +85,11 @@ impl StreamWorker {
 		Ok(())
 	}
 
-	fn process_samples(&mut self, samples: &[f32]) -> Result<(), AppError> {
+	fn process_samples(&mut self, samples: &[f32]) -> Result<bool, AppError> {
 		const SHERPA_SAMPLE_RATE_HZ: u32 = 16_000;
 
 		if self.cancel.is_cancelled() || samples.is_empty() {
-			return Ok(());
+			return Ok(false);
 		}
 
 		self.append_pending_tail(samples);
@@ -145,10 +148,10 @@ impl StreamWorker {
 
 		if self.stream.is_endpoint() {
 			let sherpa_text = if text.is_empty() { self.last_text.clone() } else { text };
-			self.handle_endpoint(&sherpa_text)?;
+			return self.handle_endpoint(&sherpa_text);
 		}
 
-		Ok(())
+		Ok(false)
 	}
 
 	fn maybe_emit_partial(&mut self, text: &str) {
@@ -167,7 +170,7 @@ impl StreamWorker {
 		let _ = self.update_tx.blocking_send(AsrUpdate::SherpaPartial(self.last_text.clone()));
 	}
 
-	fn handle_endpoint(&mut self, sherpa_text: &str) -> Result<(), AppError> {
+	fn handle_endpoint(&mut self, sherpa_text: &str) -> Result<bool, AppError> {
 		self.flush_pending_second_pass(true);
 		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
 		let window_generation_after = self.window_state.advance_generation();
@@ -178,7 +181,7 @@ impl StreamWorker {
 			self.segment_state.reset();
 			self.last_text.clear();
 			self.stream.reset();
-			return Ok(());
+			return Ok(true);
 		}
 
 		let segment_id = self.segment_state.next_segment_id();
@@ -200,7 +203,7 @@ impl StreamWorker {
 
 		self.last_text.clear();
 		self.stream.reset();
-		Ok(())
+		Ok(true)
 	}
 
 	fn finalize_stream(&mut self) -> Result<(), AppError> {
@@ -301,24 +304,31 @@ impl StreamWorker {
 
 		let fallback_text = forced_finalize_fallback_text(&result.text, &self.last_text);
 		let has_voice = self.segment_state.peak_mean_abs() >= self.stt_settings.window.min_mean_abs;
+		let should_emit_segment = forced_finalize_should_emit_segment(has_voice, &fallback_text);
 		let window_generation_after = self.window_state.advance_generation();
-
-		if !forced_finalize_should_emit_segment(has_voice, &fallback_text) {
-			let _ =
-				self.update_tx.blocking_send(AsrUpdate::EndpointReset { window_generation_after });
+		let (segment_id, committed_end_16k_samples) = if should_emit_segment {
+			(
+				self.segment_state.next_segment_id(),
+				self.window_state.total_16k_samples(),
+			)
+		} else {
+			(0, 0)
+		};
+		let update = forced_finalize_update(
+			should_emit_segment,
+			segment_id,
+			&fallback_text,
+			committed_end_16k_samples,
+			window_generation_after,
+		);
+		let is_reset = matches!(update, AsrUpdate::EndpointReset { .. });
+		let _ = self.update_tx.blocking_send(update);
+		if is_reset {
 			self.segment_state.reset();
 			self.last_text.clear();
 			self.stream.reset();
 			return Ok(());
 		}
-
-		let segment_id = self.segment_state.next_segment_id();
-		let _ = self.update_tx.blocking_send(AsrUpdate::SegmentEnd {
-			segment_id,
-			sherpa_text: fallback_text,
-			committed_end_16k_samples: self.window_state.total_16k_samples(),
-			window_generation_after,
-		});
 
 		let (segment_samples, peak_mean_abs) = self.segment_state.take();
 		tracing::info!(
@@ -455,8 +465,28 @@ fn forced_finalize_fallback_text(final_text: &str, last_text: &str) -> String {
 	}
 }
 
+
 fn forced_finalize_should_emit_segment(has_voice: bool, fallback_text: &str) -> bool {
 	has_voice && !fallback_text.trim().is_empty()
+}
+
+fn forced_finalize_update(
+	should_emit_segment: bool,
+	segment_id: u64,
+	fallback_text: &str,
+	committed_end_16k_samples: u64,
+	window_generation_after: u64,
+) -> AsrUpdate {
+	if !should_emit_segment {
+		return AsrUpdate::EndpointReset { window_generation_after };
+	}
+
+	AsrUpdate::SegmentEnd {
+		segment_id,
+		sherpa_text: fallback_text.to_string(),
+		committed_end_16k_samples,
+		window_generation_after,
+	}
 }
 
 #[cfg(test)]
@@ -469,7 +499,20 @@ mod tests {
 	}
 	#[test]
 	fn forced_finalize_emits_endpoint_reset_when_no_audio() {
-		let outcome = forced_finalize_should_emit_segment(false, "");
-		assert!(!outcome);
+		let update = forced_finalize_update(false, 0, "", 0, 1);
+		assert!(matches!(update, AsrUpdate::EndpointReset { window_generation_after: 1 }));
+	}
+	#[test]
+	fn forced_finalize_update_emits_segment_end_when_valid() {
+		let update = forced_finalize_update(true, 7, "hello", 1_600, 2);
+		assert!(matches!(
+			update,
+			AsrUpdate::SegmentEnd {
+				segment_id: 7,
+				sherpa_text,
+				committed_end_16k_samples: 1_600,
+				window_generation_after: 2,
+			} if sherpa_text == "hello"
+		));
 	}
 }

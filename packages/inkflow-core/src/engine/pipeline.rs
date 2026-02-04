@@ -184,6 +184,9 @@ impl LocalStreamSecondPassPipeline {
 		};
 
 		if !has_worker {
+			let _ = self.raw_update_tx.blocking_send(AsrUpdate::EndpointReset {
+				window_generation_after: 1,
+			});
 			return Ok(());
 		}
 
