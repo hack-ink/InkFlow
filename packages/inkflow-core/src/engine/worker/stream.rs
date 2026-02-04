@@ -215,8 +215,7 @@ impl StreamWorker {
 			)
 		})?;
 
-		let final_text = result.text.trim().to_string();
-		let fallback_text = if final_text.is_empty() { self.last_text.clone() } else { final_text };
+		let fallback_text = forced_finalize_fallback_text(&result.text, &self.last_text);
 
 		if self.segment_state.is_empty() {
 			return Ok(());
@@ -360,4 +359,22 @@ pub(crate) fn spawn_asr_worker(
 
 		worker.run()
 	})
+}
+
+fn forced_finalize_fallback_text(final_text: &str, last_text: &str) -> String {
+	let trimmed = final_text.trim();
+	if trimmed.is_empty() {
+		last_text.trim().to_string()
+	} else {
+		trimmed.to_string()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn forced_finalize_fallback_text_uses_last_text_when_final_empty() {
+		let resolved = super::forced_finalize_fallback_text("", "hello");
+		assert_eq!(resolved, "hello");
+	}
 }
