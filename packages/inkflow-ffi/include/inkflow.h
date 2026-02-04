@@ -33,6 +33,8 @@ int32_t inkflow_engine_submit_audio(
 	uint32_t sample_rate_hz
 );
 
+int32_t inkflow_engine_force_finalize(InkFlowHandle *handle);
+
 int32_t inkflow_engine_register_callback(
 	InkFlowHandle *handle,
 	inkflow_update_cb callback,

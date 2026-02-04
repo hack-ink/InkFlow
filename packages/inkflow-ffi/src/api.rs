@@ -96,6 +96,29 @@ pub unsafe extern "C" fn inkflow_engine_submit_audio(
 
 #[unsafe(no_mangle)]
 /// # Safety
+/// The caller must pass a valid pointer returned by `inkflow_engine_create`.
+pub unsafe extern "C" fn inkflow_engine_force_finalize(handle: *mut InkFlowHandle) -> i32 {
+	if handle.is_null() {
+		return InkFlowStatus::Null.code();
+	}
+
+	let engine = unsafe { &*handle }.engine.clone();
+	let guard = match engine.lock() {
+		Ok(guard) => guard,
+		Err(_) => return InkFlowStatus::InternalError.code(),
+	};
+	let Some(engine) = guard.as_ref() else {
+		return InkFlowStatus::InternalError.code();
+	};
+
+	match engine.force_finalize() {
+		Ok(()) => InkFlowStatus::Ok.code(),
+		Err(err) => map_error_status(&err).code(),
+	}
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
 /// The caller must pass a valid `handle` pointer returned by `inkflow_engine_create`.
 /// The `callback` pointer must be a valid function pointer for the duration of the callback thread.
 pub unsafe extern "C" fn inkflow_engine_register_callback(
@@ -151,5 +174,16 @@ fn map_error_status(err: &AppError) -> InkFlowStatus {
 	match err.code.as_str() {
 		"audio_invalid" | "settings_invalid" => InkFlowStatus::InvalidArgument,
 		_ => InkFlowStatus::InternalError,
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn force_finalize_returns_null_when_handle_missing() {
+		let status = unsafe { inkflow_engine_force_finalize(ptr::null_mut()) };
+		assert_eq!(status, InkFlowStatus::Null.code());
 	}
 }
