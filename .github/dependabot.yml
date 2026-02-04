@@ -6,13 +6,13 @@ updates:
       interval: "daily"
       time: "00:00"
     labels:
-      - "Bot"
-      - "Dep"
+      - "bot"
+      - "dependencies"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
       time: "00:00"
     labels:
-      - "Bot"
-      - "GA"
+      - "bot"
+      - "dependencies"
