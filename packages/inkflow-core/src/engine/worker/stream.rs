@@ -372,9 +372,10 @@ fn forced_finalize_fallback_text(final_text: &str, last_text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+	use super::*;
 	#[test]
 	fn forced_finalize_fallback_text_uses_last_text_when_final_empty() {
-		let resolved = super::forced_finalize_fallback_text("", "hello");
+		let resolved = forced_finalize_fallback_text("", "hello");
 		assert_eq!(resolved, "hello");
 	}
 }
