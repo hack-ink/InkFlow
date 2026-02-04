@@ -127,6 +127,11 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
 
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
       - name: Run SwiftLint
         run: cargo make lint-swift
 
