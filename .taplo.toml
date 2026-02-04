@@ -1,6 +1,11 @@
 exclude = [
 	".worktrees",
+	".worktrees/**",
 	"Makefile.toml",
+	"target",
+	"target/**",
+	"third_party",
+	"third_party/**",
 ]
 
 [formatting]
