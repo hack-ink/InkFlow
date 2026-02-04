@@ -128,14 +128,22 @@ final class InkFlowViewModel: ObservableObject {
 
 	private func handleUpdate(_ update: InkFlowUpdate) {
 		if pendingFinalize {
-			switch update.kind {
-			case "segment_end", "endpoint_reset", "error":
-				pendingFinalize = false
-				client?.unregisterUpdates()
-			default:
-				break
-			}
+			handleFinalizeCompletion(update)
 		}
+		applyUpdate(update)
+	}
+
+	private func handleFinalizeCompletion(_ update: InkFlowUpdate) {
+		switch update.kind {
+		case "segment_end", "endpoint_reset", "error":
+			pendingFinalize = false
+			client?.unregisterUpdates()
+		default:
+			break
+		}
+	}
+
+	private func applyUpdate(_ update: InkFlowUpdate) {
 		switch update.kind {
 		case "live_render":
 			transcript = update.text ?? ""

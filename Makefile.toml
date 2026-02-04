@@ -110,6 +110,7 @@ workspace = false
 command = "swiftlint"
 args = [
 	"lint",
+	"--strict",
 	"--config",
 	".swiftlint.yml",
 	"apps/macos/InkFlow/InkFlow",

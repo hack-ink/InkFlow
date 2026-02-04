@@ -12,3 +12,6 @@ opt_in_rules:
 
 indentation_width:
   indentation_width: 2
+
+trailing_comma:
+  mandatory_comma: true
