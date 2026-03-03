@@ -46,6 +46,11 @@ struct AppConfig {
 		hotkey = "fn"
 		"""
 
+	init(appearance: Appearance, dictation: Dictation) {
+		self.appearance = appearance
+		self.dictation = dictation
+	}
+
 	init(parsed: TomlDictionary) {
 		let appearance = Self.parseAppearance(from: parsed)
 		let dictation = Self.parseDictation(from: parsed)

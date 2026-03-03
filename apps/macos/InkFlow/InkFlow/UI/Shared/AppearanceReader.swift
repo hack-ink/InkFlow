@@ -5,7 +5,7 @@ struct AppearanceReader<Content: View>: View {
 
 	private var appearance: AppearanceStyle {
 		let appearanceConfig = ConfigStore.shared.current.appearance
-		AppearanceStyle(
+		return AppearanceStyle(
 			theme: AppearanceStyle.theme(from: appearanceConfig.theme),
 			accent: AppearanceStyle.accent(from: appearanceConfig.accent),
 			glassIntensity: AppearanceStyle.glassIntensity(from: appearanceConfig.glassIntensity),
